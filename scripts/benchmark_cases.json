@@ -1,0 +1,7 @@
+[
+  {"question": "退款多久到账？", "expected_filename": "refund-policy.md"},
+  {"question": "购买后几天内可以全额退款？", "expected_filename": "refund-policy.md"},
+  {"question": "远程办公考勤怎么打卡？", "expected_filename": "remote-work-policy.md"},
+  {"question": "VPN 连不上怎么办？", "expected_filename": "it-faq.md"},
+  {"question": "忘记公司邮箱密码怎么办？", "expected_filename": "it-faq.md"}
+]

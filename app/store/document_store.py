@@ -81,6 +81,18 @@ class DocumentStore:
             ).fetchone()
         return int(row["cnt"])
 
+    def update_chunk_count(self, doc_id: str, chunk_count: int, status: str = "READY") -> bool:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE documents
+                SET chunk_count = ?, status = ?
+                WHERE id = ?
+                """,
+                (chunk_count, status, doc_id),
+            )
+            return cursor.rowcount > 0
+
     @staticmethod
     def _row_to_record(row: sqlite3.Row) -> DocumentRecord:
         return DocumentRecord(

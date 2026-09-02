@@ -155,6 +155,97 @@
         }
         .input-area button:hover { background: var(--accent-hover); }
         .input-area button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .settings-panel {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        .settings-panel h3 {
+            font-size: 14px;
+            color: var(--muted);
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .settings-panel h3 button {
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 12px;
+            cursor: pointer;
+            padding: 0;
+        }
+        .field {
+            margin-bottom: 12px;
+        }
+        .field label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+        .field label span.value {
+            color: var(--text);
+            font-variant-numeric: tabular-nums;
+        }
+        .field input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+        }
+        .field input[type="number"] {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 13px;
+        }
+        .settings-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .settings-actions button {
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .settings-actions button.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+        .settings-actions button.primary:hover { background: var(--accent-hover); }
+        .settings-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .settings-hint {
+            margin-top: 10px;
+            font-size: 11px;
+            line-height: 1.5;
+            color: var(--muted);
+        }
+        .settings-hint.warn { color: #f59e0b; }
+        .settings-hint.ok { color: var(--success); }
+        .preview-box {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            font-size: 11px;
+            line-height: 1.5;
+            color: var(--muted);
+            max-height: 140px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body>
@@ -171,6 +262,33 @@
                     <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.md,.txt,.html">
                 </label>
             </div>
+            <div class="settings-panel">
+                <h3>
+                    RAG 参数
+                    <button type="button" id="resetSettingsBtn">恢复默认</button>
+                </h3>
+                <div class="field">
+                    <label>Top-K <span class="value" id="topKValue">4</span></label>
+                    <input type="range" id="topKInput" min="1" max="10" step="1" value="4">
+                </div>
+                <div class="field">
+                    <label>Chunk Size <span class="value" id="chunkSizeValue">512</span></label>
+                    <input type="range" id="chunkSizeInput" min="128" max="2048" step="64" value="512">
+                </div>
+                <div class="field">
+                    <label>Chunk Overlap <span class="value" id="chunkOverlapValue">64</span></label>
+                    <input type="range" id="chunkOverlapInput" min="0" max="256" step="16" value="64">
+                </div>
+                <div class="settings-actions">
+                    <button type="button" class="primary" id="applySettingsBtn">应用参数</button>
+                    <button type="button" id="reindexBtn" disabled>重建索引</button>
+                    <button type="button" id="previewBtn">预览检索效果</button>
+                </div>
+                <div class="settings-hint" id="settingsHint">
+                    Top-K 修改后立即生效；Chunk 参数需重建索引后生效。
+                </div>
+                <div class="preview-box" id="previewBox" hidden></div>
+            </div>
             <div class="doc-list" id="docList"></div>
         </aside>
         <section class="chat-area">
@@ -186,6 +304,9 @@
 
     <script>
         let conversationId = null;
+        let ragSettings = null;
+
+        const DEFAULT_SETTINGS = { topK: 4, chunkSize: 512, chunkOverlap: 64 };
 
         async function init() {
             const res = await fetch('/api/chat/conversation', { method: 'POST' });
@@ -193,7 +314,137 @@
             conversationId = data.conversationId;
             await loadHealth();
             await loadDocuments();
+            await loadRagSettings();
         }
+
+        function bindRangeInput(rangeId, valueId) {
+            const range = document.getElementById(rangeId);
+            const value = document.getElementById(valueId);
+            range.addEventListener('input', () => {
+                value.textContent = range.value;
+            });
+        }
+
+        bindRangeInput('topKInput', 'topKValue');
+        bindRangeInput('chunkSizeInput', 'chunkSizeValue');
+        bindRangeInput('chunkOverlapInput', 'chunkOverlapValue');
+
+        function readSettingsForm() {
+            return {
+                topK: Number(document.getElementById('topKInput').value),
+                chunkSize: Number(document.getElementById('chunkSizeInput').value),
+                chunkOverlap: Number(document.getElementById('chunkOverlapInput').value),
+            };
+        }
+
+        function fillSettingsForm(settings) {
+            document.getElementById('topKInput').value = settings.topK;
+            document.getElementById('topKValue').textContent = settings.topK;
+            document.getElementById('chunkSizeInput').value = settings.chunkSize;
+            document.getElementById('chunkSizeValue').textContent = settings.chunkSize;
+            document.getElementById('chunkOverlapInput').value = settings.chunkOverlap;
+            document.getElementById('chunkOverlapValue').textContent = settings.chunkOverlap;
+            updateSettingsHint(settings);
+        }
+
+        function updateSettingsHint(settings) {
+            const hint = document.getElementById('settingsHint');
+            const reindexBtn = document.getElementById('reindexBtn');
+            reindexBtn.disabled = !settings.needsReindex;
+
+            if (settings.needsReindex) {
+                hint.className = 'settings-hint warn';
+                hint.textContent =
+                    `索引仍为 chunk=${settings.indexedChunkSize}, overlap=${settings.indexedChunkOverlap}，` +
+                    '请点击「重建索引」使新切分参数生效。';
+            } else {
+                hint.className = 'settings-hint ok';
+                hint.textContent = '参数已同步。Top-K 立即影响检索；Chunk 参数已与当前索引一致。';
+            }
+        }
+
+        async function loadRagSettings() {
+            const res = await fetch('/api/settings/rag');
+            ragSettings = await res.json();
+            fillSettingsForm(ragSettings);
+        }
+
+        async function applyRagSettings() {
+            const payload = readSettingsForm();
+            const btn = document.getElementById('applySettingsBtn');
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/settings/rag', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || '参数更新失败');
+                }
+                ragSettings = data;
+                fillSettingsForm(ragSettings);
+            } catch (e) {
+                document.getElementById('settingsHint').className = 'settings-hint warn';
+                document.getElementById('settingsHint').textContent = e.message;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function reindexDocuments() {
+            const btn = document.getElementById('reindexBtn');
+            btn.disabled = true;
+            btn.textContent = '重建中...';
+            try {
+                const res = await fetch('/api/settings/rag/reindex', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || '重建索引失败');
+                }
+                await loadRagSettings();
+                await loadDocuments();
+                await loadHealth();
+                document.getElementById('settingsHint').className = 'settings-hint ok';
+                document.getElementById('settingsHint').textContent = data.message;
+            } catch (e) {
+                document.getElementById('settingsHint').className = 'settings-hint warn';
+                document.getElementById('settingsHint').textContent = e.message;
+            } finally {
+                btn.textContent = '重建索引';
+                btn.disabled = !ragSettings?.needsReindex;
+            }
+        }
+
+        async function previewRetrieval() {
+            const question = document.getElementById('questionInput').value.trim()
+                || '退款多久到账？';
+            const box = document.getElementById('previewBox');
+            box.hidden = false;
+            box.textContent = '检索中...';
+
+            try {
+                const res = await fetch(`/api/chat/sources?question=${encodeURIComponent(question)}`);
+                const sources = await res.json();
+                if (!sources.length) {
+                    box.textContent = '未检索到相关片段，请确认知识库已有文档。';
+                    return;
+                }
+                box.textContent = sources.map((s, i) =>
+                    `#${i + 1} ${s.filename} (score=${s.score.toFixed(4)})\n${s.snippet}`
+                ).join('\n\n');
+            } catch {
+                box.textContent = '预览失败，请检查服务状态。';
+            }
+        }
+
+        document.getElementById('applySettingsBtn').addEventListener('click', applyRagSettings);
+        document.getElementById('reindexBtn').addEventListener('click', reindexDocuments);
+        document.getElementById('previewBtn').addEventListener('click', previewRetrieval);
+        document.getElementById('resetSettingsBtn').addEventListener('click', () => {
+            fillSettingsForm({ ...DEFAULT_SETTINGS, needsReindex: ragSettings?.needsReindex });
+        });
 
         async function loadHealth() {
             try {

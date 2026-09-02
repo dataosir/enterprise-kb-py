@@ -13,6 +13,8 @@ from app.models import (
     ChatResponse,
     HealthResponse,
     IngestResult,
+    RagSettingsUpdate,
+    ReindexResult,
     RetrievedChunk,
 )
 from app.services import bootstrap_sample_docs, get_rag_engine
@@ -34,6 +36,32 @@ app = FastAPI(
     description="本地企业知识库 RAG Demo — FastAPI + LangChain + Chroma",
     lifespan=lifespan,
 )
+
+
+@app.get("/api/settings/rag")
+def get_rag_settings() -> dict:
+    return get_rag_engine().get_settings()
+
+
+@app.put("/api/settings/rag")
+def update_rag_settings(req: RagSettingsUpdate) -> dict:
+    if req.top_k is None and req.chunk_size is None and req.chunk_overlap is None:
+        raise HTTPException(status_code=400, detail="至少提供一个参数")
+
+    try:
+        return get_rag_engine().update_settings(
+            top_k=req.top_k,
+            chunk_size=req.chunk_size,
+            chunk_overlap=req.chunk_overlap,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/settings/rag/reindex", response_model=ReindexResult)
+def reindex_documents() -> ReindexResult:
+    result = get_rag_engine().reindex_all()
+    return ReindexResult(**result)
 
 
 @app.get("/api/health", response_model=HealthResponse)

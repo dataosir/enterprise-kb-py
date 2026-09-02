@@ -2,7 +2,7 @@
 
 > 本地可运行的 RAG Demo — FastAPI + LangChain + Chroma  
 > Java 版见 `../enterprise-kb/`，两个项目 API 对齐，方便对照学习。  
-> 架构说明见 [ARCHITECTURE.md](ARCHITECTURE.md)
+> 架构说明见 [ARCHITECTURE.md](ARCHITECTURE.md)，学习指南见 [LEARNING.md](LEARNING.md)
 
 ## 功能
 
@@ -154,6 +154,16 @@ make dev      # 重启后会重新加载 sample-docs
 ```
 
 ## 学习路线
+
+详细流程与核心代码解读见 [LEARNING.md](LEARNING.md)。
+
+**调参对比（自动评测 chunk / topK）：**
+
+```bash
+make benchmark
+# 或 ./scripts/benchmark.sh --verbose
+# 结果 → data/benchmark/benchmark_rag_params.csv
+```
 
 ```
 Week 1                              Week 2

@@ -1,4 +1,4 @@
-.PHONY: install dev start package reset docker-up docker-down
+.PHONY: install dev start package benchmark reset docker-up docker-down
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -17,6 +17,9 @@ start:
 
 package:
 	./package.sh
+
+benchmark:
+	./scripts/benchmark.sh
 
 reset:
 	rm -rf data/chroma data/uploads data/metadata.db

@@ -17,18 +17,16 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.config import (
     CHAT_MODEL,
     CHROMA_DIR,
-    CHUNK_OVERLAP,
-    CHUNK_SIZE,
     EMBEDDING_MODEL,
     EMBEDDING_PROVIDER,
     LOCAL_EMBEDDING_MODEL,
     OPENAI_API_KEY,
     OPENAI_BASE_URL,
-    TOP_K,
     UPLOAD_DIR,
 )
 from app.models.domain import DocumentRecord, RetrievedChunk
 from app.store.document_store import DocumentStore, get_document_store
+from app.store.rag_settings import RagSettingsStore, get_rag_settings_store
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +34,13 @@ logger = logging.getLogger(__name__)
 class RagEngine:
     """RAG 核心引擎：文档入库 → 向量检索 → LLM 生成。"""
 
-    def __init__(self, doc_store: DocumentStore | None = None) -> None:
+    def __init__(
+        self,
+        doc_store: DocumentStore | None = None,
+        settings_store: RagSettingsStore | None = None,
+    ) -> None:
         self.doc_store = doc_store or get_document_store()
+        self.settings_store = settings_store or get_rag_settings_store()
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -70,10 +73,7 @@ class RagEngine:
             embedding_function=self.embeddings,
             persist_directory=str(CHROMA_DIR),
         )
-        self.splitter = RecursiveCharacterTextSplitter(
-            chunk_size=CHUNK_SIZE,
-            chunk_overlap=CHUNK_OVERLAP,
-        )
+        self._refresh_splitter()
         self._memory: dict[str, list[tuple[str, str]]] = {}
         self._prompt = ChatPromptTemplate.from_messages(
             [
@@ -85,6 +85,58 @@ class RagEngine:
                 ("human", "上下文:\n{context}\n\n历史:\n{history}\n\n问题: {question}"),
             ]
         )
+
+    def get_settings(self) -> dict:
+        return self.settings_store.get().to_api_dict()
+
+    def update_settings(
+        self,
+        *,
+        top_k: int | None = None,
+        chunk_size: int | None = None,
+        chunk_overlap: int | None = None,
+    ) -> dict:
+        settings = self.settings_store.get()
+        next_chunk_size = chunk_size if chunk_size is not None else settings.chunk_size
+        next_chunk_overlap = (
+            chunk_overlap if chunk_overlap is not None else settings.chunk_overlap
+        )
+        if next_chunk_overlap >= next_chunk_size:
+            raise ValueError("chunk_overlap 必须小于 chunk_size")
+
+        updated = self.settings_store.update(
+            top_k=top_k,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+        )
+        self._refresh_splitter()
+        return updated.to_api_dict()
+
+    def reindex_all(self) -> dict:
+        records = [r for r in self.doc_store.list_all() if r.status == "READY"]
+        total_chunks = 0
+        reindexed = 0
+
+        for record in records:
+            path = Path(record.file_path)
+            if not path.exists():
+                logger.warning("Skip reindex, file missing: %s", record.file_path)
+                continue
+
+            self.vectorstore.delete(where={"doc_id": record.id})
+            chunk_count = self._ingest_chunks(path, record.filename, record.id)
+            self.doc_store.update_chunk_count(record.id, chunk_count)
+            total_chunks += chunk_count
+            reindexed += 1
+
+        self.settings_store.mark_indexed()
+        message = f"已重建 {reindexed} 篇文档索引，共 {total_chunks} 个片段"
+        logger.info(message)
+        return {
+            "reindexed": reindexed,
+            "total_chunks": total_chunks,
+            "message": message,
+        }
 
     def ingest_file(
         self,
@@ -134,6 +186,7 @@ class RagEngine:
                         created_at=datetime.now(timezone.utc),
                     )
                 )
+                self.settings_store.mark_indexed()
 
             logger.info("Ingested %s: %d chunks", filename, len(chunks))
             return len(chunks)
@@ -169,7 +222,8 @@ class RagEngine:
         return True
 
     def retrieve_sources(self, question: str) -> list[RetrievedChunk]:
-        results = self.vectorstore.similarity_search_with_score(question, k=TOP_K)
+        top_k = self.settings_store.get().top_k
+        results = self.vectorstore.similarity_search_with_score(question, k=top_k)
         chunks: list[RetrievedChunk] = []
         for doc, score in results:
             content = doc.page_content
@@ -215,6 +269,26 @@ class RagEngine:
 
     def vector_count(self) -> int:
         return self.vectorstore._collection.count()
+
+    def _ingest_chunks(self, file_path: Path, filename: str, doc_id: str) -> int:
+        docs = self._load_documents(file_path, filename)
+        for doc in docs:
+            doc.metadata["doc_id"] = doc_id
+            doc.metadata["filename"] = filename
+
+        chunks = self.splitter.split_documents(docs)
+        if not chunks:
+            return 0
+
+        self.vectorstore.add_documents(chunks)
+        return len(chunks)
+
+    def _refresh_splitter(self) -> None:
+        settings = self.settings_store.get()
+        self.splitter = RecursiveCharacterTextSplitter(
+            chunk_size=settings.chunk_size,
+            chunk_overlap=settings.chunk_overlap,
+        )
 
     def _load_documents(self, file_path: Path, filename: str) -> list[Document]:
         suffix = file_path.suffix.lower()
