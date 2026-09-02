@@ -1,0 +1,14 @@
+services:
+  kb:
+    build: .
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - model-cache:/root/.cache/huggingface
+    restart: unless-stopped
+
+volumes:
+  model-cache:

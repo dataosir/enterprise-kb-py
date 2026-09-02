@@ -1,82 +1,170 @@
 # 企业知识库问答 Agent (Python 版)
 
-> **面试学习专用** — FastAPI + LangChain + Chroma  
-> Java 版见 `../enterprise-kb/`，两个项目 API 对齐，方便对照学习。
-
-## 为什么单独起一个 Python 项目？
-
-| 维度 | Java (`enterprise-kb`) | Python (`enterprise-kb-py`) |
-|------|------------------------|------------------------------|
-| 面试叙事 | 「企业级落地、Spring 生态整合」 | 「RAG/Agent 原理、快速实验」 |
-| 生态 | Spring AI，资料相对少 | LangChain/LangGraph，教程和案例最多 |
-| 迭代速度 | 编译 + 配置重 | 改几行就能跑，适合调参 |
-| 简历定位 | 主项目，写进工作经历 | 学习项目，体现技术广度 |
-
-**建议分工**：Python 用来**快速学透 RAG 链路**（2 周内把混合检索、Rerank、LangGraph 跑通），Java 用来**包装成可讲的生产项目**（Redis 会话、SSE、PGVector、监控）。
+> 本地可运行的 RAG Demo — FastAPI + LangChain + Chroma  
+> Java 版见 `../enterprise-kb/`，两个项目 API 对齐，方便对照学习。  
+> 架构说明见 [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ## 功能
 
-- 文档上传（PDF / Word / Markdown）
+- 文档上传（PDF / Word / Markdown / TXT）
 - Chroma 向量检索 + RAG 问答
 - 引用来源返回
 - SSE 流式输出
-- 启动自动加载 `sample-docs/`
+- 启动自动加载 `sample-docs/`（仅首次，不重复入库）
+- 文档列表 / 删除 / 健康检查
 
 ## 快速开始
 
+### 方式一：一键启动（推荐）
+
+**macOS / Linux：**
+
 ```bash
 cd enterprise-kb-py
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-cp .env.example .env
-# 编辑 .env 填入 DEEPSEEK_API_KEY（或 export DEEPSEEK_API_KEY=sk-xxx）
-
-uvicorn app.main:app --reload --port 8081
+./start.sh            # 自动创建虚拟环境、安装依赖、启动服务
+# 编辑 .env 填入 DEEPSEEK_API_KEY（首次会自动从 .env.example 复制）
+# → http://localhost:8081
 ```
 
-浏览器打开 http://localhost:8081（端口 8081 避免和 Java 版冲突）
+**Windows（CMD / PowerShell）：**
 
-### DeepSeek 配置（推荐）
+```bat
+cd enterprise-kb-py
+start.bat             # 开发模式，自动创建 .venv、安装依赖
+start.bat --prod      # 生产模式（无热重载）
+set PORT=9000 && start.bat
+```
 
-DeepSeek 只提供对话 API，**Embedding 默认用本地 BGE 中文模型**（免费，首次启动会下载）：
+等价命令（macOS / Linux）：`make start`
+
+### 方式二：分步运行
 
 ```bash
-# .env 中配置
+cd enterprise-kb-py
+make install          # 创建虚拟环境 + 安装依赖 + 复制 .env
+# 编辑 .env，填入 DEEPSEEK_API_KEY
+make dev              # 启动服务 → http://localhost:8081
+```
+
+### 方式三：Docker
+
+```bash
+cp .env.example .env  # 填入 API Key
+make docker-up        # 构建并启动 → http://localhost:8081
+```
+
+### 一键打包（分发 / 离线部署）
+
+```bash
+./package.sh              # 生成 dist/enterprise-kb-py-<版本>.tar.gz
+./package.sh --docker     # 同时构建并导出 Docker 镜像
+```
+
+等价命令：`make package`
+
+### 验证
+
+```bash
+# 健康检查
+curl http://localhost:8081/api/health
+
+# 问答（示例文档已自动入库）
+curl -X POST http://localhost:8081/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question":"退款多久到账？"}'
+
+# 检索预览
+curl "http://localhost:8081/api/chat/sources?question=远程办公考勤"
+
+# 文档列表
+curl http://localhost:8081/api/documents
+```
+
+浏览器打开 http://localhost:8081 可使用 Web UI。
+
+## 配置说明
+
+### DeepSeek（推荐，默认）
+
+DeepSeek 只提供对话 API，**Embedding 默认用本地 BGE 中文模型**（免费，首次启动会下载约 100MB）：
+
+```bash
+# .env
 DEEPSEEK_API_KEY=sk-xxx
 OPENAI_BASE_URL=https://api.deepseek.com/v1
 OPENAI_CHAT_MODEL=deepseek-chat
 EMBEDDING_PROVIDER=local
-HF_ENDPOINT=https://hf-mirror.com   # 国内下载模型用
+HF_ENDPOINT=https://hf-mirror.com   # 国内下载模型镜像
 ```
 
-面试话术：「对话走 DeepSeek，向量检索用本地 BGE，避免 Embedding API 成本和网络依赖。」
-
-## API（与 Java 版一致）
+### Ollama（纯本地，无需 API Key）
 
 ```bash
-curl http://localhost:8081/api/health
-curl -X POST http://localhost:8081/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"question":"退款多久到账？"}'
-curl "http://localhost:8081/api/chat/sources?question=远程办公考勤"
+# 先启动 Ollama 并拉取模型: ollama pull qwen2.5:7b
+OPENAI_API_KEY=ollama
+OPENAI_BASE_URL=http://localhost:11434/v1
+OPENAI_CHAT_MODEL=qwen2.5:7b
+EMBEDDING_PROVIDER=local
 ```
 
-## 2 周学习路线（Python 主攻）
+### OpenAI 全家桶
+
+```bash
+OPENAI_API_KEY=sk-xxx
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_CHAT_MODEL=gpt-4o-mini
+EMBEDDING_PROVIDER=openai
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+```
+
+## 项目结构
 
 ```
-Week 1（Python）                    Week 2（Python → Java 迁移）
-──────────────                      ────────────────────────────
-✅ 跑通 RAG 基础                     → BM25 + 向量混合检索 (3.3)
-✅ 调 chunk / topK                  → Cross-Encoder Rerank (3.4)
-→ Query 改写 HyDE (3.5)            → LangGraph 多步检索 (2.3)
-→ RAGAS 评估 (3.6)                 → 把验证过的方案迁回 Java 版
+app/
+├── main.py              # API 路由
+├── config.py            # 配置
+├── models/              # 数据模型
+├── store/               # SQLite 文档元数据
+└── services/            # RAG 引擎 + 启动引导
+data/                    # 运行时数据（向量库、上传文件、元数据）
+sample-docs/             # 内置示例（退款政策、远程办公、IT FAQ）
+static/                  # Web UI
+```
+
+## API
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/health` | GET | 服务状态 + 文档统计 |
+| `/api/documents` | GET | 文档列表 |
+| `/api/documents/upload` | POST | 上传文档 |
+| `/api/documents/{id}` | DELETE | 删除文档 |
+| `/api/chat` | POST | 问答 |
+| `/api/chat/stream` | GET | SSE 流式问答 |
+| `/api/chat/sources` | GET | 检索预览 |
+| `/api/chat/conversation` | POST | 创建会话 |
+
+完整 API 文档：http://localhost:8081/docs
+
+## 重置知识库
+
+```bash
+make reset    # 清空 data/ 目录
+make dev      # 重启后会重新加载 sample-docs
+```
+
+## 学习路线
+
+```
+Week 1                              Week 2
+────────                            ────────
+✅ RAG 基础闭环                      → BM25 + 向量混合检索
+✅ 调 chunk / topK                  → Cross-Encoder Rerank
+→ Query 改写 HyDE                   → LangGraph 多步检索
+→ RAGAS 评估                        → 方案迁回 Java 版
 ```
 
 ## 面试怎么说
 
-> 「我先用 Python + LangChain 快速验证了 RAG 链路（切分策略、混合检索、Rerank），  
+> 「我先用 Python + LangChain 快速验证了 RAG 链路（切分策略、向量检索、引用来源），  
 > 确认方案可行后，用 Spring AI 做了企业级落地，接入了 Redis 会话和 PGVector。」
-
-这样既体现了 **AI 工程能力**，又保留了 **Java 后端** 的核心优势。

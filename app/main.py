@@ -1,56 +1,66 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+from uuid import uuid4
 
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
 
-from app.config import BASE_DIR, SAMPLE_DOCS_DIR
-from app.rag import RetrievedChunk, get_rag_engine
+from app.config import BASE_DIR, MAX_UPLOAD_SIZE_MB
+from app.models import (
+    ChatRequest,
+    ChatResponse,
+    HealthResponse,
+    IngestResult,
+    RetrievedChunk,
+)
+from app.services import bootstrap_sample_docs, get_rag_engine
+from app.store import get_document_store
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     engine = get_rag_engine()
-    if SAMPLE_DOCS_DIR.exists():
-        for path in SAMPLE_DOCS_DIR.glob("*"):
-            if path.is_file():
-                engine.ingest_file(path, path.name)
+    bootstrap_sample_docs(engine)
     yield
 
 
-app = FastAPI(title="Enterprise KB (Python)", lifespan=lifespan)
+app = FastAPI(
+    title="Enterprise KB (Python)",
+    description="本地企业知识库 RAG Demo — FastAPI + LangChain + Chroma",
+    lifespan=lifespan,
+)
 
 
-class ChatRequest(BaseModel):
-    question: str = Field(min_length=1)
-    conversation_id: str | None = None
+@app.get("/api/health", response_model=HealthResponse)
+def health() -> HealthResponse:
+    store = get_document_store()
+    return HealthResponse(
+        status="UP",
+        stack="FastAPI + LangChain + Chroma",
+        documents=store.count(),
+        ready_documents=store.count_ready(),
+    )
 
 
-class ChatResponse(BaseModel):
-    answer: str
-    conversation_id: str
-    sources: list[dict]
+@app.get("/api/documents")
+def list_documents() -> list[dict]:
+    return [doc.to_api_dict() for doc in get_document_store().list_all()]
 
 
-class IngestResult(BaseModel):
-    doc_id: str
-    filename: str
-    chunk_count: int
-    status: str
-    message: str
-
-
-@app.get("/api/health")
-def health() -> dict[str, str]:
-    return {"status": "UP", "stack": "FastAPI + LangChain + Chroma"}
+@app.delete("/api/documents/{doc_id}")
+def delete_document(doc_id: str) -> dict[str, str]:
+    if not get_rag_engine().delete_document(doc_id):
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"message": "文档已删除"}
 
 
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(req: ChatRequest) -> ChatResponse:
-    from uuid import uuid4
-
     conversation_id = req.conversation_id or str(uuid4())
     answer, sources = get_rag_engine().chat(req.question, conversation_id)
     return ChatResponse(
@@ -62,8 +72,6 @@ def chat(req: ChatRequest) -> ChatResponse:
 
 @app.get("/api/chat/stream")
 def stream_chat(question: str, conversation_id: str | None = None) -> StreamingResponse:
-    from uuid import uuid4
-
     conv_id = conversation_id or str(uuid4())
 
     def event_stream():
@@ -81,26 +89,39 @@ def preview_sources(question: str) -> list[dict]:
 
 @app.post("/api/chat/conversation")
 def new_conversation() -> dict[str, str]:
-    from uuid import uuid4
-
     return {"conversationId": str(uuid4())}
 
 
 @app.post("/api/documents/upload", response_model=IngestResult)
 async def upload_document(file: UploadFile = File(...)) -> IngestResult:
-    import shutil
-    from uuid import uuid4
-
     from app.config import UPLOAD_DIR
 
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="文件名不能为空")
+
+    content = await file.read()
+    max_bytes = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    if len(content) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"文件大小超过限制（最大 {MAX_UPLOAD_SIZE_MB}MB）",
+        )
+
     doc_id = str(uuid4())
-    filename = Path(file.filename or "upload.txt").name
+    filename = Path(file.filename).name
     saved_path = UPLOAD_DIR / f"{doc_id}_{filename}"
 
     with saved_path.open("wb") as out:
-        shutil.copyfileobj(file.file, out)
+        out.write(content)
 
-    chunk_count = get_rag_engine().ingest_file(saved_path, filename, doc_id)
+    try:
+        chunk_count = get_rag_engine().ingest_file(
+            saved_path, filename, doc_id, file_size=len(content)
+        )
+    except Exception as exc:
+        saved_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail=f"文档入库失败: {exc}") from exc
+
     return IngestResult(
         doc_id=doc_id,
         filename=filename,

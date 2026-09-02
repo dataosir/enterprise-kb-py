@@ -13,6 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 UPLOAD_DIR = DATA_DIR / "uploads"
 CHROMA_DIR = DATA_DIR / "chroma"
+DB_PATH = DATA_DIR / "metadata.db"
 SAMPLE_DOCS_DIR = BASE_DIR / "sample-docs"
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or os.getenv("DEEPSEEK_API_KEY", "")
@@ -28,3 +29,4 @@ HF_ENDPOINT = os.getenv("HF_ENDPOINT", "https://hf-mirror.com")
 TOP_K = int(os.getenv("RAG_TOP_K", "4"))
 CHUNK_SIZE = int(os.getenv("RAG_CHUNK_SIZE", "512"))
 CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "64"))
+MAX_UPLOAD_SIZE_MB = int(os.getenv("MAX_UPLOAD_SIZE_MB", "20"))

@@ -200,7 +200,7 @@
                 const res = await fetch('/api/health');
                 const data = await res.json();
                 document.getElementById('status').textContent =
-                    `已就绪 ${data.readyDocuments}/${data.documents} 篇文档`;
+                    `已就绪 ${data.ready_documents}/${data.documents} 篇文档`;
             } catch {
                 document.getElementById('status').textContent = '服务未连接';
             }
