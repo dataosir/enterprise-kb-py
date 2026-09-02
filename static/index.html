@@ -47,6 +47,7 @@
             background: var(--surface);
             display: flex;
             flex-direction: column;
+            overflow-y: auto;
         }
         .sidebar h2 {
             padding: 16px;
@@ -159,6 +160,46 @@
             padding: 16px;
             border-bottom: 1px solid var(--border);
         }
+        .settings-section {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+        .settings-section h4 {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        .field textarea {
+            width: 100%;
+            min-height: 72px;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 12px;
+            line-height: 1.4;
+            resize: vertical;
+        }
+        .field-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 10px;
+        }
+        .field-row input[type="checkbox"] {
+            accent-color: var(--accent);
+        }
+        .field-row.warn-label {
+            color: #f59e0b;
+            font-size: 11px;
+            line-height: 1.4;
+        }
         .settings-panel h3 {
             font-size: 14px;
             color: var(--muted);
@@ -267,25 +308,98 @@
                     RAG 参数
                     <button type="button" id="resetSettingsBtn">恢复默认</button>
                 </h3>
-                <div class="field">
-                    <label>Top-K <span class="value" id="topKValue">4</span></label>
-                    <input type="range" id="topKInput" min="1" max="10" step="1" value="4">
+
+                <div class="settings-section">
+                    <h4>检索</h4>
+                    <div class="field">
+                        <label for="retrievalModeInput">检索模式</label>
+                        <select id="retrievalModeInput">
+                            <option value="vector">纯向量</option>
+                            <option value="hybrid">混合检索 (BM25 + 向量)</option>
+                        </select>
+                    </div>
+                    <div class="field" id="hybridAlphaField">
+                        <label>向量权重 α <span class="value" id="hybridAlphaValue">0.50</span></label>
+                        <input type="range" id="hybridAlphaInput" min="0" max="1" step="0.05" value="0.5">
+                    </div>
+                    <div class="field" id="rrfKField">
+                        <label>RRF 常数 K <span class="value" id="rrfKValue">60</span></label>
+                        <input type="range" id="rrfKInput" min="10" max="120" step="5" value="60">
+                    </div>
+                    <div class="field-row" id="esStatusRow">
+                        <span>ES 状态：<strong id="esStatusText">-</strong></span>
+                    </div>
+                    <div class="field">
+                        <label>Top-K <span class="value" id="topKValue">4</span></label>
+                        <input type="range" id="topKInput" min="1" max="10" step="1" value="4">
+                    </div>
+                    <div class="field">
+                        <label>Fetch-K <span class="value" id="fetchKValue">20</span></label>
+                        <input type="range" id="fetchKInput" min="4" max="50" step="1" value="20">
+                    </div>
+                    <div class="field">
+                        <label>相似度阈值 (L2，留空=不过滤)</label>
+                        <input type="number" id="scoreThresholdInput" min="0" step="0.01" placeholder="不过滤">
+                    </div>
+                    <div class="field-row">
+                        <label for="useMmrInput">启用 MMR 多样性</label>
+                        <input type="checkbox" id="useMmrInput">
+                    </div>
+                    <div class="field">
+                        <label>MMR Lambda <span class="value" id="mmrLambdaValue">0.5</span></label>
+                        <input type="range" id="mmrLambdaInput" min="0" max="1" step="0.05" value="0.5">
+                    </div>
+                    <div class="field-row">
+                        <label for="useRerankInput">启用 Rerank 重排</label>
+                        <input type="checkbox" id="useRerankInput">
+                    </div>
+                    <div class="field-row warn-label">Rerank 约额外占用 400MB 内存，低内存设备请谨慎开启</div>
                 </div>
-                <div class="field">
-                    <label>Chunk Size <span class="value" id="chunkSizeValue">512</span></label>
-                    <input type="range" id="chunkSizeInput" min="128" max="2048" step="64" value="512">
+
+                <div class="settings-section">
+                    <h4>生成</h4>
+                    <div class="field">
+                        <label>Temperature <span class="value" id="temperatureValue">0.2</span></label>
+                        <input type="range" id="temperatureInput" min="0" max="1" step="0.05" value="0.2">
+                    </div>
+                    <div class="field">
+                        <label>历史轮数 <span class="value" id="historyTurnsValue">3</span></label>
+                        <input type="range" id="historyTurnsInput" min="0" max="10" step="1" value="3">
+                    </div>
+                    <div class="field">
+                        <label>最大上下文字符数 <span class="value" id="maxContextCharsValue">4000</span></label>
+                        <input type="range" id="maxContextCharsInput" min="500" max="8000" step="100" value="4000">
+                    </div>
+                    <div class="field">
+                        <label>预览 Snippet 长度 <span class="value" id="snippetLengthValue">200</span></label>
+                        <input type="range" id="snippetLengthInput" min="50" max="500" step="10" value="200">
+                    </div>
+                    <div class="field">
+                        <label>System Prompt</label>
+                        <textarea id="systemPromptInput" placeholder="企业知识库助手系统提示词"></textarea>
+                    </div>
                 </div>
-                <div class="field">
-                    <label>Chunk Overlap <span class="value" id="chunkOverlapValue">64</span></label>
-                    <input type="range" id="chunkOverlapInput" min="0" max="256" step="16" value="64">
+
+                <div class="settings-section">
+                    <h4>索引</h4>
+                    <div class="field">
+                        <label>Chunk Size <span class="value" id="chunkSizeValue">512</span></label>
+                        <input type="range" id="chunkSizeInput" min="128" max="2048" step="64" value="512">
+                    </div>
+                    <div class="field">
+                        <label>Chunk Overlap <span class="value" id="chunkOverlapValue">64</span></label>
+                        <input type="range" id="chunkOverlapInput" min="0" max="256" step="16" value="64">
+                    </div>
                 </div>
+
                 <div class="settings-actions">
                     <button type="button" class="primary" id="applySettingsBtn">应用参数</button>
                     <button type="button" id="reindexBtn" disabled>重建索引</button>
+                    <button type="button" id="syncEsBtn" disabled>同步 ES 索引</button>
                     <button type="button" id="previewBtn">预览检索效果</button>
                 </div>
                 <div class="settings-hint" id="settingsHint">
-                    Top-K 修改后立即生效；Chunk 参数需重建索引后生效。
+                    检索/生成参数应用后立即生效；Chunk 参数需重建索引。
                 </div>
                 <div class="preview-box" id="previewBox" hidden></div>
             </div>
@@ -306,7 +420,24 @@
         let conversationId = null;
         let ragSettings = null;
 
-        const DEFAULT_SETTINGS = { topK: 4, chunkSize: 512, chunkOverlap: 64 };
+        const DEFAULT_SETTINGS = {
+            topK: 4,
+            chunkSize: 512,
+            chunkOverlap: 64,
+            fetchK: 20,
+            scoreThreshold: null,
+            useMmr: false,
+            mmrLambda: 0.5,
+            useRerank: false,
+            temperature: 0.2,
+            historyTurns: 3,
+            maxContextChars: 4000,
+            systemPrompt: '你是企业内部知识库助手。仅根据提供的上下文回答，不知道就说不知道。回答简洁，并在末尾列出引用文档名。',
+            snippetLength: 200,
+            retrievalMode: 'vector',
+            hybridAlpha: 0.5,
+            rrfK: 60,
+        };
 
         async function init() {
             const res = await fetch('/api/chat/conversation', { method: 'POST' });
@@ -317,34 +448,120 @@
             await loadRagSettings();
         }
 
-        function bindRangeInput(rangeId, valueId) {
+        function bindRangeInput(rangeId, valueId, formatter) {
             const range = document.getElementById(rangeId);
             const value = document.getElementById(valueId);
             range.addEventListener('input', () => {
-                value.textContent = range.value;
+                value.textContent = formatter ? formatter(range.value) : range.value;
             });
         }
 
         bindRangeInput('topKInput', 'topKValue');
+        bindRangeInput('fetchKInput', 'fetchKValue');
+        bindRangeInput('mmrLambdaInput', 'mmrLambdaValue', v => Number(v).toFixed(2));
+        bindRangeInput('temperatureInput', 'temperatureValue', v => Number(v).toFixed(2));
+        bindRangeInput('historyTurnsInput', 'historyTurnsValue');
+        bindRangeInput('maxContextCharsInput', 'maxContextCharsValue');
+        bindRangeInput('snippetLengthInput', 'snippetLengthValue');
         bindRangeInput('chunkSizeInput', 'chunkSizeValue');
         bindRangeInput('chunkOverlapInput', 'chunkOverlapValue');
+        bindRangeInput('hybridAlphaInput', 'hybridAlphaValue', v => Number(v).toFixed(2));
+        bindRangeInput('rrfKInput', 'rrfKValue');
+
+        document.getElementById('retrievalModeInput').addEventListener('change', syncRetrievalMode);
+        document.getElementById('useMmrInput').addEventListener('change', syncRetrievalMode);
+        document.getElementById('useRerankInput').addEventListener('change', syncRetrievalMode);
+
+        function syncRetrievalMode(event) {
+            const mmr = document.getElementById('useMmrInput');
+            const rerank = document.getElementById('useRerankInput');
+            const mode = document.getElementById('retrievalModeInput').value;
+            const hybrid = mode === 'hybrid';
+
+            document.getElementById('hybridAlphaField').style.display = hybrid ? 'block' : 'none';
+            document.getElementById('rrfKField').style.display = hybrid ? 'block' : 'none';
+
+            if (hybrid && mmr.checked) {
+                mmr.checked = false;
+            }
+
+            if (mmr.checked && rerank.checked) {
+                if (event && event.target === mmr) {
+                    rerank.checked = false;
+                } else {
+                    mmr.checked = false;
+                }
+            }
+        }
 
         function readSettingsForm() {
-            return {
+            const thresholdRaw = document.getElementById('scoreThresholdInput').value.trim();
+            const payload = {
                 topK: Number(document.getElementById('topKInput').value),
+                fetchK: Number(document.getElementById('fetchKInput').value),
+                useMmr: document.getElementById('useMmrInput').checked,
+                mmrLambda: Number(document.getElementById('mmrLambdaInput').value),
+                useRerank: document.getElementById('useRerankInput').checked,
+                temperature: Number(document.getElementById('temperatureInput').value),
+                historyTurns: Number(document.getElementById('historyTurnsInput').value),
+                maxContextChars: Number(document.getElementById('maxContextCharsInput').value),
+                systemPrompt: document.getElementById('systemPromptInput').value.trim(),
+                snippetLength: Number(document.getElementById('snippetLengthInput').value),
                 chunkSize: Number(document.getElementById('chunkSizeInput').value),
                 chunkOverlap: Number(document.getElementById('chunkOverlapInput').value),
+                retrievalMode: document.getElementById('retrievalModeInput').value,
+                hybridAlpha: Number(document.getElementById('hybridAlphaInput').value),
+                rrfK: Number(document.getElementById('rrfKInput').value),
             };
+            payload.scoreThreshold = thresholdRaw ? Number(thresholdRaw) : null;
+            return payload;
         }
 
         function fillSettingsForm(settings) {
             document.getElementById('topKInput').value = settings.topK;
             document.getElementById('topKValue').textContent = settings.topK;
+            document.getElementById('fetchKInput').value = settings.fetchK;
+            document.getElementById('fetchKValue').textContent = settings.fetchK;
+            document.getElementById('scoreThresholdInput').value =
+                settings.scoreThreshold == null ? '' : settings.scoreThreshold;
+            document.getElementById('useMmrInput').checked = !!settings.useMmr;
+            document.getElementById('mmrLambdaInput').value = settings.mmrLambda;
+            document.getElementById('mmrLambdaValue').textContent = Number(settings.mmrLambda).toFixed(2);
+            document.getElementById('useRerankInput').checked = !!settings.useRerank;
+            document.getElementById('temperatureInput').value = settings.temperature;
+            document.getElementById('temperatureValue').textContent = Number(settings.temperature).toFixed(2);
+            document.getElementById('historyTurnsInput').value = settings.historyTurns;
+            document.getElementById('historyTurnsValue').textContent = settings.historyTurns;
+            document.getElementById('maxContextCharsInput').value = settings.maxContextChars;
+            document.getElementById('maxContextCharsValue').textContent = settings.maxContextChars;
+            document.getElementById('snippetLengthInput').value = settings.snippetLength;
+            document.getElementById('snippetLengthValue').textContent = settings.snippetLength;
+            document.getElementById('systemPromptInput').value = settings.systemPrompt || DEFAULT_SETTINGS.systemPrompt;
             document.getElementById('chunkSizeInput').value = settings.chunkSize;
             document.getElementById('chunkSizeValue').textContent = settings.chunkSize;
             document.getElementById('chunkOverlapInput').value = settings.chunkOverlap;
             document.getElementById('chunkOverlapValue').textContent = settings.chunkOverlap;
+            document.getElementById('retrievalModeInput').value = settings.retrievalMode || 'vector';
+            document.getElementById('hybridAlphaInput').value = settings.hybridAlpha ?? 0.5;
+            document.getElementById('hybridAlphaValue').textContent = Number(settings.hybridAlpha ?? 0.5).toFixed(2);
+            document.getElementById('rrfKInput').value = settings.rrfK ?? 60;
+            document.getElementById('rrfKValue').textContent = settings.rrfK ?? 60;
+            updateEsStatus(settings);
+            syncRetrievalMode();
             updateSettingsHint(settings);
+        }
+
+        function updateEsStatus(settings) {
+            const statusEl = document.getElementById('esStatusText');
+            const syncBtn = document.getElementById('syncEsBtn');
+            if (!settings.esEnabled) {
+                statusEl.textContent = '未配置';
+                syncBtn.disabled = true;
+                return;
+            }
+            const count = settings.esChunkCount ?? 0;
+            statusEl.textContent = `${settings.esStatus} (${count} 片段)`;
+            syncBtn.disabled = settings.esStatus !== 'connected';
         }
 
         function updateSettingsHint(settings) {
@@ -352,14 +569,17 @@
             const reindexBtn = document.getElementById('reindexBtn');
             reindexBtn.disabled = !settings.needsReindex;
 
+            const mode = settings.retrievalMode === 'hybrid'
+                ? '混合检索'
+                : (settings.useRerank ? 'Rerank' : (settings.useMmr ? 'MMR' : '向量'));
             if (settings.needsReindex) {
                 hint.className = 'settings-hint warn';
                 hint.textContent =
-                    `索引仍为 chunk=${settings.indexedChunkSize}, overlap=${settings.indexedChunkOverlap}，` +
-                    '请点击「重建索引」使新切分参数生效。';
+                    `当前索引 chunk=${settings.indexedChunkSize}, overlap=${settings.indexedChunkOverlap}；` +
+                    `检索模式=${mode}。Chunk 变更需重建索引，其余参数已可即时调试。`;
             } else {
                 hint.className = 'settings-hint ok';
-                hint.textContent = '参数已同步。Top-K 立即影响检索；Chunk 参数已与当前索引一致。';
+                hint.textContent = `参数已同步。检索模式=${mode}；检索/生成参数立即生效。`;
             }
         }
 
@@ -370,6 +590,7 @@
         }
 
         async function applyRagSettings() {
+            syncRetrievalMode();
             const payload = readSettingsForm();
             const btn = document.getElementById('applySettingsBtn');
             btn.disabled = true;
@@ -439,11 +660,41 @@
             }
         }
 
+        async function syncEsIndex() {
+            const btn = document.getElementById('syncEsBtn');
+            btn.disabled = true;
+            btn.textContent = '同步中...';
+            try {
+                const res = await fetch('/api/settings/rag/sync-es', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || 'ES 同步失败');
+                }
+                await loadRagSettings();
+                await loadDocuments();
+                await loadHealth();
+                document.getElementById('settingsHint').className = 'settings-hint ok';
+                document.getElementById('settingsHint').textContent = data.message;
+            } catch (e) {
+                document.getElementById('settingsHint').className = 'settings-hint warn';
+                document.getElementById('settingsHint').textContent = e.message;
+            } finally {
+                btn.textContent = '同步 ES 索引';
+                btn.disabled = !ragSettings?.esEnabled || ragSettings?.esStatus !== 'connected';
+            }
+        }
+
         document.getElementById('applySettingsBtn').addEventListener('click', applyRagSettings);
         document.getElementById('reindexBtn').addEventListener('click', reindexDocuments);
+        document.getElementById('syncEsBtn').addEventListener('click', syncEsIndex);
         document.getElementById('previewBtn').addEventListener('click', previewRetrieval);
         document.getElementById('resetSettingsBtn').addEventListener('click', () => {
-            fillSettingsForm({ ...DEFAULT_SETTINGS, needsReindex: ragSettings?.needsReindex });
+            fillSettingsForm({
+                ...DEFAULT_SETTINGS,
+                needsReindex: ragSettings?.needsReindex,
+                indexedChunkSize: ragSettings?.indexedChunkSize,
+                indexedChunkOverlap: ragSettings?.indexedChunkOverlap,
+            });
         });
 
         async function loadHealth() {
@@ -451,7 +702,7 @@
                 const res = await fetch('/api/health');
                 const data = await res.json();
                 document.getElementById('status').textContent =
-                    `已就绪 ${data.ready_documents}/${data.documents} 篇文档`;
+                    `已就绪 ${data.ready_documents}/${data.documents} 篇 · ${data.retrievalMode} · ES:${data.esStatus}`;
             } catch {
                 document.getElementById('status').textContent = '服务未连接';
             }

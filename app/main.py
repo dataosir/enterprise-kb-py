@@ -11,6 +11,7 @@ from app.config import BASE_DIR, MAX_UPLOAD_SIZE_MB
 from app.models import (
     ChatRequest,
     ChatResponse,
+    EsSyncResult,
     HealthResponse,
     IngestResult,
     RagSettingsUpdate,
@@ -45,7 +46,8 @@ def get_rag_settings() -> dict:
 
 @app.put("/api/settings/rag")
 def update_rag_settings(req: RagSettingsUpdate) -> dict:
-    if req.top_k is None and req.chunk_size is None and req.chunk_overlap is None:
+    payload = req.model_dump(exclude_unset=True)
+    if not payload:
         raise HTTPException(status_code=400, detail="至少提供一个参数")
 
     try:
@@ -53,6 +55,19 @@ def update_rag_settings(req: RagSettingsUpdate) -> dict:
             top_k=req.top_k,
             chunk_size=req.chunk_size,
             chunk_overlap=req.chunk_overlap,
+            score_threshold=req.score_threshold if "score_threshold" in payload else ...,
+            fetch_k=req.fetch_k,
+            use_mmr=req.use_mmr,
+            mmr_lambda=req.mmr_lambda,
+            use_rerank=req.use_rerank,
+            temperature=req.temperature,
+            history_turns=req.history_turns,
+            max_context_chars=req.max_context_chars,
+            system_prompt=req.system_prompt,
+            snippet_length=req.snippet_length,
+            retrieval_mode=req.retrieval_mode,
+            hybrid_alpha=req.hybrid_alpha,
+            rrf_k=req.rrf_k,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -64,14 +79,32 @@ def reindex_documents() -> ReindexResult:
     return ReindexResult(**result)
 
 
+@app.post("/api/settings/rag/sync-es", response_model=EsSyncResult)
+def sync_es_index() -> EsSyncResult:
+    try:
+        result = get_rag_engine().sync_es_index()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return EsSyncResult(**result)
+
+
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     store = get_document_store()
+    engine = get_rag_engine()
+    settings = engine.settings_store.get()
+    es_store = engine.es_store
+    stack = "FastAPI + LangChain + Chroma"
+    if es_store.enabled:
+        stack += " + Elasticsearch"
     return HealthResponse(
         status="UP",
-        stack="FastAPI + LangChain + Chroma",
+        stack=stack,
         documents=store.count(),
         ready_documents=store.count_ready(),
+        es_enabled=es_store.enabled,
+        es_status=es_store.status(),
+        retrieval_mode=settings.retrieval_mode,
     )
 
 

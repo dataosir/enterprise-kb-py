@@ -17,6 +17,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.config import (
     CHAT_MODEL,
     CHROMA_DIR,
+    DEFAULT_SYSTEM_PROMPT,
     EMBEDDING_MODEL,
     EMBEDDING_PROVIDER,
     LOCAL_EMBEDDING_MODEL,
@@ -25,6 +26,10 @@ from app.config import (
     UPLOAD_DIR,
 )
 from app.models.domain import DocumentRecord, RetrievedChunk
+from app.services.retrieval.context_builder import build_context
+from app.services.retrieval.es_store import ElasticsearchStore, get_es_store
+from app.services.retrieval.hybrid import fuse_hybrid_results
+from app.services.retrieval.reranker import Reranker
 from app.store.document_store import DocumentStore, get_document_store
 from app.store.rag_settings import RagSettingsStore, get_rag_settings_store
 
@@ -38,19 +43,14 @@ class RagEngine:
         self,
         doc_store: DocumentStore | None = None,
         settings_store: RagSettingsStore | None = None,
+        es_store: ElasticsearchStore | None = None,
     ) -> None:
         self.doc_store = doc_store or get_document_store()
         self.settings_store = settings_store or get_rag_settings_store()
+        self.es_store = es_store if es_store is not None else get_es_store()
+        self._reranker = Reranker()
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         CHROMA_DIR.mkdir(parents=True, exist_ok=True)
-
-        llm_kwargs: dict[str, Any] = {
-            "model": CHAT_MODEL,
-            "api_key": OPENAI_API_KEY,
-            "temperature": 0.2,
-        }
-        if OPENAI_BASE_URL:
-            llm_kwargs["base_url"] = OPENAI_BASE_URL
 
         if EMBEDDING_PROVIDER == "openai":
             embed_kwargs: dict[str, Any] = {
@@ -67,27 +67,22 @@ class RagEngine:
                 encode_kwargs={"normalize_embeddings": True},
             )
 
-        self.llm = ChatOpenAI(**llm_kwargs)
         self.vectorstore = Chroma(
             collection_name="enterprise_kb",
             embedding_function=self.embeddings,
             persist_directory=str(CHROMA_DIR),
         )
         self._refresh_splitter()
+        self._refresh_llm()
+        self._refresh_prompt()
         self._memory: dict[str, list[tuple[str, str]]] = {}
-        self._prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "你是企业内部知识库助手。仅根据提供的上下文回答，"
-                    "不知道就说不知道。回答简洁，并在末尾列出引用文档名。",
-                ),
-                ("human", "上下文:\n{context}\n\n历史:\n{history}\n\n问题: {question}"),
-            ]
-        )
 
     def get_settings(self) -> dict:
-        return self.settings_store.get().to_api_dict()
+        data = self.settings_store.get().to_api_dict()
+        data["esEnabled"] = self.es_store.enabled
+        data["esStatus"] = self.es_store.status()
+        data["esChunkCount"] = self.es_store.count() if self.es_store.available else 0
+        return data
 
     def update_settings(
         self,
@@ -95,22 +90,48 @@ class RagEngine:
         top_k: int | None = None,
         chunk_size: int | None = None,
         chunk_overlap: int | None = None,
+        score_threshold: float | None = ...,  # type: ignore[assignment]
+        fetch_k: int | None = None,
+        use_mmr: bool | None = None,
+        mmr_lambda: float | None = None,
+        use_rerank: bool | None = None,
+        temperature: float | None = None,
+        history_turns: int | None = None,
+        max_context_chars: int | None = None,
+        system_prompt: str | None = None,
+        snippet_length: int | None = None,
+        retrieval_mode: str | None = None,
+        hybrid_alpha: float | None = None,
+        rrf_k: int | None = None,
     ) -> dict:
-        settings = self.settings_store.get()
-        next_chunk_size = chunk_size if chunk_size is not None else settings.chunk_size
-        next_chunk_overlap = (
-            chunk_overlap if chunk_overlap is not None else settings.chunk_overlap
-        )
-        if next_chunk_overlap >= next_chunk_size:
-            raise ValueError("chunk_overlap 必须小于 chunk_size")
-
         updated = self.settings_store.update(
             top_k=top_k,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
+            score_threshold=score_threshold,
+            fetch_k=fetch_k,
+            use_mmr=use_mmr,
+            mmr_lambda=mmr_lambda,
+            use_rerank=use_rerank,
+            temperature=temperature,
+            history_turns=history_turns,
+            max_context_chars=max_context_chars,
+            system_prompt=system_prompt,
+            snippet_length=snippet_length,
+            retrieval_mode=retrieval_mode,
+            hybrid_alpha=hybrid_alpha,
+            rrf_k=rrf_k,
         )
         self._refresh_splitter()
-        return updated.to_api_dict()
+        if temperature is not None:
+            self._refresh_llm()
+        if system_prompt is not None:
+            self._refresh_prompt()
+        return updated.to_api_dict() | {
+            "esEnabled": self.es_store.enabled,
+            "esStatus": self.es_store.status(),
+            "esChunkCount": self.es_store.count() if self.es_store.available else 0,
+        }
 
     def reindex_all(self) -> dict:
         records = [r for r in self.doc_store.list_all() if r.status == "READY"]
@@ -131,11 +152,26 @@ class RagEngine:
 
         self.settings_store.mark_indexed()
         message = f"已重建 {reindexed} 篇文档索引，共 {total_chunks} 个片段"
+        if self.es_store.available:
+            message += f"；ES 全文索引 {self.es_store.count()} 个片段"
         logger.info(message)
         return {
             "reindexed": reindexed,
             "total_chunks": total_chunks,
             "message": message,
+        }
+
+    def sync_es_index(self) -> dict:
+        """全量重建向量库与 Elasticsearch 索引，确保 chunk_id 一致。"""
+        if not self.es_store.available:
+            raise ValueError("Elasticsearch 未配置或不可用，无法同步")
+
+        self.es_store.clear_index()
+        result = self.reindex_all()
+        return {
+            "synced_documents": result["reindexed"],
+            "total_chunks": result["total_chunks"],
+            "message": result["message"],
         }
 
     def ingest_file(
@@ -172,7 +208,10 @@ class RagEngine:
                     )
                 return 0
 
+            self._assign_chunk_ids(chunks)
             self.vectorstore.add_documents(chunks)
+            self.es_store.delete_by_doc_id(doc_id)
+            self.es_store.index_chunks(chunks)
 
             if persist_metadata:
                 self.doc_store.add(
@@ -212,6 +251,7 @@ class RagEngine:
             return False
 
         self.vectorstore.delete(where={"doc_id": doc_id})
+        self.es_store.delete_by_doc_id(doc_id)
         self.doc_store.delete(doc_id)
 
         file_path = Path(record.file_path)
@@ -222,8 +262,50 @@ class RagEngine:
         return True
 
     def retrieve_sources(self, question: str) -> list[RetrievedChunk]:
-        top_k = self.settings_store.get().top_k
-        results = self.vectorstore.similarity_search_with_score(question, k=top_k)
+        settings = self.settings_store.get()
+        fetch_k = max(settings.fetch_k, settings.top_k)
+        results: list[tuple[Document, float]]
+
+        use_hybrid = (
+            settings.retrieval_mode == "hybrid"
+            and self.es_store.available
+            and self.es_store.count() > 0
+        )
+        if settings.retrieval_mode == "hybrid" and not use_hybrid:
+            logger.warning("混合检索已开启但 ES 不可用或索引为空，已回退为纯向量检索")
+
+        if use_hybrid:
+            vector_results = self.vectorstore.similarity_search_with_score(question, k=fetch_k)
+            bm25_results = self.es_store.search(question, size=fetch_k)
+            results = fuse_hybrid_results(
+                vector_results,
+                bm25_results,
+                alpha=settings.hybrid_alpha,
+                rrf_k=settings.rrf_k,
+            )
+        elif settings.use_mmr:
+            docs = self.vectorstore.max_marginal_relevance_search(
+                question,
+                k=settings.top_k,
+                fetch_k=fetch_k,
+                lambda_mult=settings.mmr_lambda,
+            )
+            results = [(doc, 0.0) for doc in docs]
+        else:
+            results = self.vectorstore.similarity_search_with_score(question, k=fetch_k)
+
+        if settings.score_threshold is not None and not use_hybrid:
+            results = [
+                (doc, score)
+                for doc, score in results
+                if float(score) <= settings.score_threshold
+            ]
+
+        if settings.use_rerank and results:
+            results = self._reranker.rerank(question, results, settings.top_k)
+        else:
+            results = results[: settings.top_k]
+
         chunks: list[RetrievedChunk] = []
         for doc, score in results:
             content = doc.page_content
@@ -231,7 +313,7 @@ class RagEngine:
                 RetrievedChunk(
                     filename=str(doc.metadata.get("filename", "unknown")),
                     content=content,
-                    snippet=self._truncate(content, 200),
+                    snippet=self._truncate(content, settings.snippet_length),
                     score=float(score),
                 )
             )
@@ -239,7 +321,8 @@ class RagEngine:
 
     def chat(self, question: str, conversation_id: str) -> tuple[str, list[RetrievedChunk]]:
         sources = self.retrieve_sources(question)
-        context = "\n\n".join(f"[{s.filename}] {s.content}" for s in sources)
+        settings = self.settings_store.get()
+        context = build_context(sources, settings.max_context_chars)
         history = self._format_history(conversation_id)
 
         chain = self._prompt | self.llm
@@ -252,7 +335,8 @@ class RagEngine:
 
     def stream_chat(self, question: str, conversation_id: str) -> Iterator[str]:
         sources = self.retrieve_sources(question)
-        context = "\n\n".join(f"[{s.filename}] {s.content}" for s in sources)
+        settings = self.settings_store.get()
+        context = build_context(sources, settings.max_context_chars)
         history = self._format_history(conversation_id)
 
         chain = self._prompt | self.llm
@@ -271,6 +355,7 @@ class RagEngine:
         return self.vectorstore._collection.count()
 
     def _ingest_chunks(self, file_path: Path, filename: str, doc_id: str) -> int:
+        self.es_store.delete_by_doc_id(doc_id)
         docs = self._load_documents(file_path, filename)
         for doc in docs:
             doc.metadata["doc_id"] = doc_id
@@ -280,14 +365,42 @@ class RagEngine:
         if not chunks:
             return 0
 
+        self._assign_chunk_ids(chunks)
         self.vectorstore.add_documents(chunks)
+        self.es_store.index_chunks(chunks)
         return len(chunks)
+
+    @staticmethod
+    def _assign_chunk_ids(chunks: list[Document]) -> None:
+        for chunk in chunks:
+            chunk.metadata["chunk_id"] = str(uuid4())
 
     def _refresh_splitter(self) -> None:
         settings = self.settings_store.get()
         self.splitter = RecursiveCharacterTextSplitter(
             chunk_size=settings.chunk_size,
             chunk_overlap=settings.chunk_overlap,
+        )
+
+    def _refresh_llm(self) -> None:
+        settings = self.settings_store.get()
+        llm_kwargs: dict[str, Any] = {
+            "model": CHAT_MODEL,
+            "api_key": OPENAI_API_KEY,
+            "temperature": settings.temperature,
+        }
+        if OPENAI_BASE_URL:
+            llm_kwargs["base_url"] = OPENAI_BASE_URL
+        self.llm = ChatOpenAI(**llm_kwargs)
+
+    def _refresh_prompt(self) -> None:
+        settings = self.settings_store.get()
+        prompt_text = settings.system_prompt.strip() or DEFAULT_SYSTEM_PROMPT
+        self._prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", prompt_text),
+                ("human", "上下文:\n{context}\n\n历史:\n{history}\n\n问题: {question}"),
+            ]
         )
 
     def _load_documents(self, file_path: Path, filename: str) -> list[Document]:
@@ -307,10 +420,13 @@ class RagEngine:
         return docs
 
     def _format_history(self, conversation_id: str) -> str:
+        settings = self.settings_store.get()
         turns = self._memory.get(conversation_id, [])
-        if not turns:
+        if not turns or settings.history_turns <= 0:
             return "（无）"
-        return "\n".join(f"用户: {q}\n助手: {a}" for q, a in turns[-3:])
+        return "\n".join(
+            f"用户: {q}\n助手: {a}" for q, a in turns[-settings.history_turns :]
+        )
 
     def _append_memory(self, conversation_id: str, question: str, answer: str) -> None:
         self._memory.setdefault(conversation_id, []).append((question, answer))

@@ -2,7 +2,7 @@
 
 > 本地可运行的 RAG Demo — FastAPI + LangChain + Chroma  
 > Java 版见 `../enterprise-kb/`，两个项目 API 对齐，方便对照学习。  
-> 架构说明见 [ARCHITECTURE.md](ARCHITECTURE.md)，学习指南见 [LEARNING.md](LEARNING.md)
+> 架构说明见 [ARCHITECTURE.md](ARCHITECTURE.md)，学习指南见 [LEARNING.md](LEARNING.md)，企业级演进方案见 [docs/ENTERPRISE_PLAN.md](docs/ENTERPRISE_PLAN.md)，中间件安装见 [docs/MIDDLEWARE_SETUP.md](docs/MIDDLEWARE_SETUP.md)
 
 ## 功能
 

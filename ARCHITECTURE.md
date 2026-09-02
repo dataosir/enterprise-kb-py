@@ -117,9 +117,11 @@ static/                  # Web UI
 按优先级排列，适合逐步开源迭代：
 
 1. **Phase 1（当前）** — 跑通闭环：上传、检索、问答、文档管理
-2. **Phase 2** — 检索增强：BM25 混合检索、Cross-Encoder Rerank
-3. **Phase 3** — Agent 化：LangGraph 多步检索、Query 改写
-4. **Phase 4** — 评估与运维：RAGAS 评估、日志、监控
+2. **Phase 2** — 检索增强：BM25 混合检索、Cross-Encoder Rerank、生成侧调参
+3. **Phase 3** — 基础设施：Redis 会话、异步入库、pgvector / MinIO
+4. **Phase 4** — 安全与运维：JWT 鉴权、多租户、RAGAS 评估、Prometheus
+
+详细技术方案见 [docs/ENTERPRISE_PLAN.md](docs/ENTERPRISE_PLAN.md)；飞牛 NAS 中间件安装记录见 [docs/MIDDLEWARE_SETUP.md](docs/MIDDLEWARE_SETUP.md)。
 
 ## 本地开发
 
