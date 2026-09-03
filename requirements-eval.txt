@@ -1,0 +1,4 @@
+# L3 RAGAS 评测可选依赖（make eval-ragas 或 scripts/eval_ragas.py --run --ragas）
+-r requirements.txt
+ragas>=0.2.0
+datasets>=2.14.0

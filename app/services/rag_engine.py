@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
@@ -33,6 +34,7 @@ from app.services.retrieval.reranker import Reranker
 from app.store.conversation_store import ConversationStore, get_conversation_store
 from app.store.document_store import DocumentStore, get_document_store
 from app.store.rag_settings import RagSettingsStore, get_rag_settings_store
+from app.observability.metrics import record_chat_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -358,25 +360,43 @@ class RagEngine:
         return chunks
 
     def chat(self, question: str, conversation_id: str) -> tuple[str, list[RetrievedChunk]]:
+        t0 = time.perf_counter()
         sources = self.retrieve_sources(question)
+        retrieval_seconds = time.perf_counter() - t0
+
         settings = self.settings_store.get()
         context = build_context(sources, settings.max_context_chars)
         history = self._format_history(conversation_id)
 
+        t1 = time.perf_counter()
         chain = self._prompt | self.llm
         answer = chain.invoke(
             {"context": context or "（无相关上下文）", "history": history, "question": question}
         ).content
+        generation_seconds = time.perf_counter() - t1
 
-        self._append_memory(conversation_id, question, str(answer))
-        return str(answer), sources
+        answer_text = str(answer)
+        self._append_memory(conversation_id, question, answer_text)
+        record_chat_metrics(
+            retrieval_seconds=retrieval_seconds,
+            generation_seconds=generation_seconds,
+            stream=False,
+            question=question,
+            answer=answer_text,
+            context=context,
+        )
+        return answer_text, sources
 
     def stream_chat(self, question: str, conversation_id: str) -> Iterator[str]:
+        t0 = time.perf_counter()
         sources = self.retrieve_sources(question)
+        retrieval_seconds = time.perf_counter() - t0
+
         settings = self.settings_store.get()
         context = build_context(sources, settings.max_context_chars)
         history = self._format_history(conversation_id)
 
+        t1 = time.perf_counter()
         chain = self._prompt | self.llm
         full_answer = ""
         for chunk in chain.stream(
@@ -386,8 +406,17 @@ class RagEngine:
             if text:
                 full_answer += text
                 yield text
+        generation_seconds = time.perf_counter() - t1
 
         self._append_memory(conversation_id, question, full_answer)
+        record_chat_metrics(
+            retrieval_seconds=retrieval_seconds,
+            generation_seconds=generation_seconds,
+            stream=True,
+            question=question,
+            answer=full_answer,
+            context=context,
+        )
 
     def vector_count(self) -> int:
         return self.vectorstore.count()

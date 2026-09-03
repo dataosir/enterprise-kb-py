@@ -3,5 +3,8 @@
 __pycache__/
 *.pyc
 data/
+!data/eval/
+data/eval/*
+!data/eval/baseline.json
 .chroma/
 dist/

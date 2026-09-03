@@ -29,6 +29,9 @@
 |---|---|
 | [`tech/README.md`](tech/README.md) | 技术层导读 |
 | [`tech/ARCHITECTURE.md`](tech/ARCHITECTURE.md) | 系统架构、数据流、目录结构、技术选型 |
+| [`tech/MIDDLEWARE.md`](tech/MIDDLEWARE.md) | **中间件专题**：AI vs 传统分类、职责、等价物、优缺点、Profile 选型 |
+| 中间件思维导图 | `http://127.0.0.1:8081/middleware-map.html` — SVG 交互图 + `/api/middleware/map` |
+| [`tech/EVALUATION.md`](tech/EVALUATION.md) | L1–L4 评测专题：切分/benchmark/RAGAS/基线/可观测/反馈回流 |
 
 ---
 
@@ -39,7 +42,7 @@
 | [`enterprise/README.md`](enterprise/README.md) | 企业层导读 |
 | [`enterprise/ENTERPRISE_PLAN.md`](enterprise/ENTERPRISE_PLAN.md) | 企业级演进总方案（Phase 2–6） |
 | [`enterprise/MIDDLEWARE_SETUP.md`](enterprise/MIDDLEWARE_SETUP.md) | 中间件 Docker 部署与运维 |
-| [`enterprise/RAG_EVALUATION.md`](enterprise/RAG_EVALUATION.md) | 切分量化、Hit@K、RAGAS 评测规划 |
+| [`enterprise/RAG_EVALUATION.md`](enterprise/RAG_EVALUATION.md) | 评测金字塔、指标定义、面试 Q&A（专题入口） |
 
 ---
 
@@ -62,7 +65,7 @@
 | [`prd/03-features/F09-object-storage.md`](prd/03-features/F09-object-storage.md) | 本地 / MinIO 对象存储 | F09 |
 | [`prd/03-features/F10-web-ui.md`](prd/03-features/F10-web-ui.md) | Web 聊天 / 上传 / 调参面板 | F10 |
 | [`prd/03-features/F11-deployment.md`](prd/03-features/F11-deployment.md) | 一键启动 / Docker / 打包 | F11 |
-| [`prd/03-features/F12-evaluation.md`](prd/03-features/F12-evaluation.md) | chunk/topK 离线 benchmark | F12 |
+| [`prd/03-features/F12-evaluation.md`](prd/03-features/F12-evaluation.md) | 切分分析 + 检索 benchmark（含 hybrid） | F12 |
 | [`prd/03-features/F13-health-status.md`](prd/03-features/F13-health-status.md) | 健康检查与中间件状态 | F13 |
 | [`prd/03-features/F14-auth-multitenant.md`](prd/03-features/F14-auth-multitenant.md) | 认证与多租户（规划） | F14 |
 | [`prd/04-nfr-constraints.md`](prd/04-nfr-constraints.md) | 非功能硬约束 | NFR |

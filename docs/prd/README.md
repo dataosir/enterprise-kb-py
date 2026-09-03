@@ -34,7 +34,7 @@
 | F09 | [对象存储](03-features/F09-object-storage.md) | 本地 / MinIO S3 | `STORAGE_BACKEND` | ✅ |
 | F10 | [Web UI](03-features/F10-web-ui.md) | 聊天/上传/调参面板 | `static/index.html` | ✅ |
 | F11 | [部署与打包](03-features/F11-deployment.md) | 一键启动/Docker/分发 | `start.sh` / `make` | ✅ |
-| F12 | [检索评测](03-features/F12-evaluation.md) | chunk/topK 离线对比 | `make benchmark` | ✅ |
+| F12 | [RAG 评测体系](03-features/F12-evaluation.md) | L1–L4 分层指标 + 基线 CI + 反馈回流 | `make eval-smoke` | ✅ |
 | F13 | [健康与状态](03-features/F13-health-status.md) | 中间件/索引状态聚合 | `GET /api/health` | ✅ |
 | F14 | [认证与多租户](03-features/F14-auth-multitenant.md) | JWT / 租户隔离 | — | 📋 规划 |
 

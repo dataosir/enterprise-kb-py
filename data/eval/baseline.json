@@ -1,0 +1,28 @@
+{
+  "updated_at": "2026-09-03",
+  "description": "L1/L2 评测基线；CI smoke 对比此文件。更新: check_eval_baseline.py --update-baseline",
+  "l1_chunk": {
+    "chunk_size": 512,
+    "chunk_overlap": 64,
+    "max_empty_chunk_rate": 0.0,
+    "min_boundary_good_rate": 0.1
+  },
+  "l2_retrieval": {
+    "config": {
+      "retrieval_mode": "vector",
+      "chunk_size": 512,
+      "chunk_overlap": 64,
+      "top_k": 4
+    },
+    "min_hit_at_1_rate": 0.85,
+    "min_hit_at_k_rate": 0.95,
+    "min_mrr": 0.85,
+    "max_avg_retrieval_ms": 10000.0,
+    "max_p95_retrieval_ms": 20000.0
+  },
+  "l3_generation": {
+    "enabled": false,
+    "min_faithfulness": 0.8,
+    "min_answer_relevancy": 0.7
+  }
+}

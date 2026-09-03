@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中间件思维导图 · AI vs 传统</title>
+    <style>
+        :root {
+            --bg: #0b0f14;
+            --surface: #121a24;
+            --surface2: #1a2433;
+            --border: #2a3a52;
+            --text: #e8edf5;
+            --muted: #8fa3bf;
+            --accent: #3b82f6;
+            --ai: #f59e0b;
+            --ai-served: #a855f7;
+            --traditional: #3b82f6;
+            --app: #64748b;
+            --glue: #94a3b8;
+            --ops: #22c55e;
+            --metric: #ef4444;
+            --pass: #22c55e;
+            --warn: #f59e0b;
+            --fail: #ef4444;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        header h1 { font-size: 18px; font-weight: 600; }
+        .header-actions { display: flex; gap: 12px; align-items: center; font-size: 13px; color: var(--muted); }
+        .btn {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .btn:hover { border-color: var(--accent); }
+        main { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        .profile-banner {
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .profile-banner.demo { border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.08); }
+        .profile-banner.enterprise { border-color: rgba(168, 85, 247, 0.4); background: rgba(168, 85, 247, 0.08); }
+        .profile-title { font-size: 16px; font-weight: 600; }
+        .profile-meta { font-size: 13px; color: var(--muted); margin-top: 4px; }
+        .section { margin-bottom: 32px; }
+        .section h2 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .category-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .cat-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 12px;
+        }
+        .cat-swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+        .flow-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        .flow-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .flow-card h3 { font-size: 14px; margin-bottom: 10px; }
+        .flow-step {
+            font-size: 13px;
+            color: var(--muted);
+            padding: 4px 0;
+            border-left: 2px solid var(--border);
+            padding-left: 10px;
+            margin-left: 4px;
+        }
+        .query-flow-section { margin-bottom: 32px; }
+        .query-example {
+            background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(168,85,247,0.1));
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+            font-size: 15px;
+        }
+        .query-example strong { color: var(--text); }
+        .query-config-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .config-chip {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface2);
+        }
+        .config-chip.on { border-color: var(--pass); color: var(--pass); background: rgba(34,197,94,0.1); }
+        .config-chip.off { opacity: 0.5; }
+        .query-flow-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .query-flow-toolbar {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            color: var(--muted);
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        #query-flow-svg {
+            width: 100%;
+            height: 920px;
+            display: block;
+            cursor: grab;
+            background: radial-gradient(ellipse at 50% 0%, rgba(59,130,246,0.06), transparent 60%);
+        }
+        #query-flow-svg:active { cursor: grabbing; }
+        .qf-node { cursor: pointer; }
+        .qf-node rect { rx: 8; stroke-width: 2; transition: filter 0.15s; }
+        .qf-node:hover rect { filter: brightness(1.15); }
+        .qf-node.inactive rect { opacity: 0.35; }
+        .qf-node.selected rect { stroke: #fff !important; stroke-width: 3; }
+        .qf-node text { font-size: 11px; fill: var(--text); pointer-events: none; }
+        .qf-node .qf-sub { font-size: 9px; fill: var(--muted); }
+        .qf-edge { stroke: #3d5270; stroke-width: 1.5; fill: none; opacity: 0.5; }
+        .qf-edge.active { stroke: var(--accent); opacity: 0.9; stroke-width: 2; }
+        .qf-edge.optional { stroke-dasharray: 6 4; }
+        .qf-phase-label { font-size: 10px; fill: var(--muted); font-weight: 600; }
+        .qf-mw-dot { font-size: 8px; }
+        .query-flow-detail {
+            margin: 12px 16px 16px;
+            padding: 14px 16px;
+            background: var(--surface2);
+            border-radius: 8px;
+            font-size: 13px;
+            min-height: 100px;
+            color: var(--muted);
+        }
+        .mw-chip {
+            display: inline-block;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin: 2px 4px 2px 0;
+        }
+        .mindmap-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .mindmap-toolbar {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+            font-size: 13px;
+            color: var(--muted);
+        }
+        .legend { display: flex; gap: 16px; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-swatch { width: 12px; height: 12px; border-radius: 3px; }
+        #mindmap-svg {
+            width: 100%;
+            height: 680px;
+            display: block;
+            cursor: grab;
+        }
+        #mindmap-svg:active { cursor: grabbing; }
+        .graph-node { cursor: pointer; }
+        .graph-node circle { stroke-width: 2; transition: r 0.15s; }
+        .graph-node:hover circle { filter: brightness(1.2); }
+        .graph-node text { font-size: 10px; fill: var(--text); pointer-events: none; }
+        .graph-edge { stroke: #3d5270; stroke-width: 1.2; fill: none; opacity: 0.55; }
+        .graph-edge.highlight { stroke: var(--accent); opacity: 1; stroke-width: 2; }
+        .detail-panel {
+            margin: 12px 16px 16px;
+            padding: 14px 16px;
+            background: var(--surface2);
+            border-radius: 8px;
+            font-size: 13px;
+            min-height: 80px;
+            color: var(--muted);
+        }
+        .detail-panel strong { color: var(--text); }
+        .detail-panel .tag {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-right: 6px;
+            margin-top: 6px;
+        }
+        .tag-ai { background: rgba(245, 158, 11, 0.2); color: var(--ai); }
+        .tag-traditional { background: rgba(59, 130, 246, 0.2); color: var(--traditional); }
+        .tag-served { background: rgba(168, 85, 247, 0.2); color: var(--ai-served); }
+        .tag-status-ok { background: rgba(34, 197, 94, 0.2); color: var(--pass); }
+        .tag-status-warn { background: rgba(245, 158, 11, 0.2); color: var(--warn); }
+        .component-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 14px;
+        }
+        .component-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px;
+            cursor: pointer;
+            transition: border-color 0.15s;
+        }
+        .component-card:hover { border-color: var(--accent); }
+        .component-card.inactive { opacity: 0.45; }
+        .component-card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+        .card-title { font-weight: 600; font-size: 14px; }
+        .card-role { font-size: 12px; color: var(--muted); margin-top: 6px; }
+        .alt-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        .alt-table th, .alt-table td {
+            padding: 6px 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+        .alt-table th { color: var(--muted); font-weight: 500; }
+        .loading { text-align: center; padding: 80px; color: var(--muted); }
+        @media (max-width: 768px) {
+            main { padding: 16px; }
+            #mindmap-svg { height: 480px; }
+            #query-flow-svg { height: 720px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>中间件思维导图 · AI vs 传统</h1>
+        <div class="header-actions">
+            <span id="updatedAt">加载中...</span>
+            <button class="btn" id="refreshBtn">刷新</button>
+            <a class="btn" href="/eval-dashboard.html">📊 评测看板</a>
+            <a class="btn" href="/">← 返回问答</a>
+        </div>
+    </header>
+
+    <main id="app">
+        <div class="loading">正在加载中间件图谱...</div>
+    </main>
+
+    <script>
+        const GROUP_COLORS = {
+            ai: '#f59e0b',
+            ai_served: '#a855f7',
+            traditional: '#3b82f6',
+            app: '#64748b',
+            glue: '#94a3b8',
+            ops: '#22c55e',
+            metrics: '#ef4444',
+            outcome: '#22c55e',
+        };
+
+        let mapData = null;
+        let graphState = { scale: 1, tx: 0, ty: 0, highlight: null };
+        let queryFlowState = { scale: 1, tx: 0, ty: 0 };
+        let selectedId = null;
+        let selectedFlowStep = null;
+
+        function aiLabel(node) {
+            if (node.ai_native === true) return { text: 'AI 原生', cls: 'tag-ai' };
+            if (node.ai_native === false && node.group === 'ai_served') return { text: '传统·为 AI 服务', cls: 'tag-served' };
+            if (node.ai_native === false) return { text: '传统互联网', cls: 'tag-traditional' };
+            return { text: 'AI 框架胶水', cls: 'tag-served' };
+        }
+
+        function statusTag(status) {
+            if (!status) return '';
+            const ok = ['connected', 'enabled', 'ok', 'UP'].includes(String(status));
+            const cls = ok ? 'tag-status-ok' : 'tag-status-warn';
+            return `<span class="tag ${cls}">${status}</span>`;
+        }
+
+        function renderProfile(data) {
+            const p = data.profile;
+            const prof = data.graph.profiles[p] || {};
+            const other = p === 'demo' ? 'enterprise' : 'demo';
+            const otherProf = data.graph.profiles[other] || {};
+            return `<div class="profile-banner ${p}">
+                <div>
+                    <div class="profile-title">当前部署：${prof.label || p}</div>
+                    <div class="profile-meta">技术栈：${data.stack || '—'} · 检索模式：${data.retrieval_mode || '—'}</div>
+                    <div class="profile-meta">活跃组件：${prof.components?.join('、') || '—'} · 中间件容器：${prof.containers ?? 0}</div>
+                </div>
+                <div style="font-size:12px;color:var(--muted);text-align:right">
+                    对比 ${otherProf.label}：${otherProf.components?.join('、') || '—'}
+                </div>
+            </div>`;
+        }
+
+        function renderCategories(categories) {
+            return `<div class="category-legend">${(categories || []).map(c => `
+                <div class="cat-chip" title="${c.description || ''}">
+                    <span class="cat-swatch" style="background:${c.color}"></span>
+                    <span><strong>${c.label}</strong> — ${c.description || ''}</span>
+                </div>`).join('')}</div>`;
+        }
+
+        function renderFlows(flows) {
+            const renderSteps = steps => (steps || []).map(s =>
+                `<div class="flow-step">${s}</div>`
+            ).join('');
+            return `<div class="flow-grid">
+                <div class="flow-card"><h3>📥 文档入库</h3>${renderSteps(flows?.ingest)}</div>
+                <div class="flow-card"><h3>💬 问答检索（文字版）</h3>${renderSteps(flows?.query)}</div>
+            </div>`;
+        }
+
+        const PHASE_COLORS = {
+            input: '#64748b',
+            context: '#3b82f6',
+            retrieval: '#f59e0b',
+            generation: '#a855f7',
+            output: '#22c55e',
+        };
+
+        function isFlowStepActive(step, flow) {
+            const ab = flow.active_branches || [];
+            if (!step.optional && !step.branch) return true;
+            if (step.branch === 'hybrid') return ab.includes('hybrid');
+            if (step.branch === 'mmr') return ab.includes('mmr');
+            if (step.branch === 'rerank') return ab.includes('rerank');
+            if (step.branch === 'threshold') return ab.includes('threshold');
+            if (step.id === 'vector_search') return ab.includes('vector') || ab.includes('hybrid');
+            return true;
+        }
+
+        function layoutQueryFlow(flow) {
+            const W = 1100, H = 900;
+            const cx = W / 2;
+            const positions = {
+                user_input:       { x: cx,     y: 40,  w: 200, h: 44 },
+                fastapi_route:    { x: cx,     y: 110, w: 200, h: 44 },
+                read_history:     { x: cx,     y: 180, w: 220, h: 44 },
+                embed_query:      { x: cx,     y: 250, w: 200, h: 44 },
+                vector_search:    { x: cx - 180, y: 340, w: 200, h: 48 },
+                mmr_search:       { x: cx - 180, y: 340, w: 200, h: 48 },
+                es_bm25:          { x: cx + 180, y: 340, w: 200, h: 48 },
+                rrf_fuse:         { x: cx,     y: 420, w: 200, h: 44 },
+                score_threshold:  { x: cx + 260, y: 420, w: 180, h: 44 },
+                rerank:           { x: cx,     y: 500, w: 200, h: 44 },
+                truncate_topk:    { x: cx,     y: 570, w: 200, h: 44 },
+                build_context:    { x: cx,     y: 640, w: 200, h: 44 },
+                llm_generate:     { x: cx,     y: 710, w: 200, h: 48 },
+                save_turn:        { x: cx,     y: 780, w: 200, h: 44 },
+                record_metrics:   { x: cx,     y: 840, w: 200, h: 44 },
+                return_response:  { x: cx,     y: 900, w: 200, h: 44 },
+            };
+            return { positions, W, H: 960 };
+        }
+
+        function mwChipHtml(mwId, lookup) {
+            const node = lookup[mwId];
+            if (!node) return '';
+            const color = GROUP_COLORS[node.group] || GROUP_COLORS.app;
+            return `<span class="mw-chip" style="background:${color}33;color:${color}">${node.label}</span>`;
+        }
+
+        function renderFlowStepDetail(step, flow, graph, components) {
+            if (!step) return '点击流程节点：查看该步骤涉及的中间件、代码位置与耗时';
+            const lookup = nodeById(graph);
+            const compById = Object.fromEntries((components || []).map(c => [c.id, c]));
+            const active = isFlowStepActive(step, flow);
+            let html = `<strong>${step.title}</strong>`;
+            if (step.optional) html += `<span class="tag tag-status-warn">${active ? '当前已启用' : '可选步骤'}</span>`;
+            else html += `<span class="tag tag-status-ok">必经步骤</span>`;
+            html += `<br>${step.description}`;
+            if (step.code_ref) html += `<br>代码：<code>${step.code_ref}</code>`;
+            if (step.latency_hint) html += `<br>耗时：<strong>${step.latency_hint}</strong>`;
+            if (step.output) html += `<br>输出：<code>${step.output}</code>`;
+            if (step.middleware_ids?.length) {
+                html += '<br>涉及中间件：';
+                step.middleware_ids.forEach(id => {
+                    const node = lookup[id];
+                    const comp = compById[id];
+                    if (node) {
+                        const tag = aiLabel(node);
+                        html += `<span class="tag ${tag.cls}">${node.label}</span>`;
+                        if (comp?.status) html += statusTag(comp.status);
+                    }
+                });
+            }
+            return html;
+        }
+
+        function renderQueryFlow(flow, graph, components) {
+            if (!flow) return '';
+            const { positions, W, H } = layoutQueryFlow(flow);
+            const lookup = nodeById(graph);
+            const cfg = flow.active_config || {};
+            const ab = flow.active_branches || [];
+
+            const configChips = [
+                { label: `检索: ${flow.retrieval_mode}`, on: true },
+                { label: 'hybrid + ES', on: ab.includes('hybrid') },
+                { label: 'MMR', on: ab.includes('mmr') },
+                { label: 'Rerank', on: cfg.use_rerank },
+                { label: `阈值过滤`, on: ab.includes('threshold') },
+                { label: `向量库: ${flow.vector_backend}`, on: true },
+                { label: `会话: ${flow.conversation_store}`, on: true },
+            ].map(c => `<span class="config-chip ${c.on ? 'on' : 'off'}">${c.label}</span>`).join('');
+
+            function edgePath(fromId, toId, opts = {}) {
+                const from = positions[fromId];
+                const to = positions[toId];
+                if (!from || !to) return '';
+                const active = opts.active !== false;
+                const cls = `qf-edge${active ? ' active' : ''}${opts.optional ? ' optional' : ''}`;
+                const x1 = from.x, y1 = from.y + from.h / 2;
+                const x2 = to.x, y2 = to.y - to.h / 2;
+                const my = (y1 + y2) / 2;
+                return `<path class="${cls}" d="M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}" marker-end="url(#qf-arrow)"/>`;
+            }
+
+            const isHybrid = ab.includes('hybrid');
+            const isMmr = ab.includes('mmr');
+            const isRerank = ab.includes('rerank');
+            const isThreshold = ab.includes('threshold');
+
+            let edges = '';
+            edges += edgePath('user_input', 'fastapi_route');
+            edges += edgePath('fastapi_route', 'read_history');
+            edges += edgePath('read_history', 'embed_query');
+            edges += edgePath('embed_query', isMmr ? 'mmr_search' : 'vector_search', { active: !isMmr || isMmr });
+            if (isHybrid) {
+                edges += edgePath('vector_search', 'es_bm25', { active: true });
+                edges += edgePath('es_bm25', 'rrf_fuse', { active: true });
+                edges += edgePath('rrf_fuse', isRerank ? 'rerank' : 'truncate_topk', { active: true });
+            } else if (isMmr) {
+                edges += edgePath('mmr_search', isRerank ? 'rerank' : 'truncate_topk', { active: true });
+            } else {
+                if (isThreshold) {
+                    edges += edgePath('vector_search', 'score_threshold', { active: true, optional: true });
+                    edges += edgePath('score_threshold', isRerank ? 'rerank' : 'truncate_topk', { active: true });
+                } else {
+                    edges += edgePath('vector_search', isRerank ? 'rerank' : 'truncate_topk', { active: true });
+                }
+            }
+            if (isRerank) edges += edgePath('rerank', 'truncate_topk', { active: true, optional: true });
+            edges += edgePath('truncate_topk', 'build_context');
+            edges += edgePath('build_context', 'llm_generate');
+            edges += edgePath('llm_generate', 'save_turn');
+            edges += edgePath('save_turn', 'record_metrics');
+            edges += edgePath('record_metrics', 'return_response');
+
+            const phaseLabels = [
+                { y: 40, text: '接入' },
+                { y: 250, text: '检索' },
+                { y: 710, text: '生成' },
+                { y: 900, text: '输出' },
+            ];
+
+            let nodesSvg = '';
+            flow.steps.forEach(step => {
+                const pos = positions[step.id];
+                if (!pos) return;
+                if (step.id === 'mmr_search' && !isMmr) return;
+                if (step.id === 'vector_search' && isMmr) return;
+                if ((step.id === 'es_bm25' || step.id === 'rrf_fuse') && !isHybrid) return;
+                if (step.id === 'score_threshold' && !isThreshold) return;
+                if (step.id === 'rerank' && !isRerank) return;
+
+                const active = isFlowStepActive(step, flow);
+                const phaseColor = PHASE_COLORS[step.phase] || '#64748b';
+                const sel = selectedFlowStep === step.id ? ' selected' : '';
+                const inactive = active ? '' : ' inactive';
+                const dash = step.optional ? ' stroke-dasharray="6 3"' : '';
+                const mwLabels = (step.middleware_ids || []).slice(0, 2).map(id => lookup[id]?.label?.split(' ')[0] || '').filter(Boolean).join(' · ');
+
+                nodesSvg += `<g class="qf-node${inactive}${sel}" data-flow-id="${step.id}" transform="translate(${pos.x - pos.w/2},${pos.y - pos.h/2})">
+                    <rect width="${pos.w}" height="${pos.h}" fill="${phaseColor}" fill-opacity="0.22" stroke="${phaseColor}"${dash}/>
+                    <text x="${pos.w/2}" y="18" text-anchor="middle" font-weight="600">${step.title}</text>
+                    <text class="qf-sub" x="${pos.w/2}" y="32" text-anchor="middle">${mwLabels || (step.optional ? '可选' : '')}</text>
+                    ${step.latency_hint ? `<text class="qf-sub" x="${pos.w/2}" y="${pos.h - 6}" text-anchor="middle">${step.latency_hint}</text>` : ''}
+                </g>`;
+            });
+
+            const phaseSvg = phaseLabels.map(p =>
+                `<text class="qf-phase-label" x="24" y="${p.y}">${p.text}</text>`
+            ).join('');
+
+            return `<div class="query-flow-section">
+                <h2 style="font-size:15px;font-weight:600;margin-bottom:16px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">
+                    用户提问 · 中间件全流程
+                </h2>
+                <div class="query-example">
+                    <strong>示例问题：</strong>「${flow.example_question}」
+                    <span style="color:var(--muted);margin-left:12px;font-size:13px">
+                        点击下方流程节点，查看各步骤中 Redis / Embedding / 向量库 / ES / Rerank / LLM 的具体职责
+                    </span>
+                </div>
+                <div class="query-config-chips">${configChips}</div>
+                <div class="query-flow-wrap">
+                    <div class="query-flow-toolbar">
+                        <span>实线 = 当前配置走的路径 · 虚线框 = 可选步骤 · 点击节点查看详情</span>
+                        <div class="legend">
+                            <div class="legend-item"><span class="legend-swatch" style="background:#64748b"></span>接入</div>
+                            <div class="legend-item"><span class="legend-swatch" style="background:#f59e0b"></span>检索</div>
+                            <div class="legend-item"><span class="legend-swatch" style="background:#a855f7"></span>生成</div>
+                            <div class="legend-item"><span class="legend-swatch" style="background:#22c55e"></span>输出</div>
+                        </div>
+                    </div>
+                    <svg id="query-flow-svg" viewBox="0 0 ${W} ${H}">
+                        <defs>
+                            <marker id="qf-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                                <path d="M0,0 L6,3 L0,6 Z" fill="#3b82f6"/>
+                            </marker>
+                        </defs>
+                        <g id="query-flow-root" transform="translate(${queryFlowState.tx},${queryFlowState.ty}) scale(${queryFlowState.scale})">
+                            ${phaseSvg}${edges}${nodesSvg}
+                        </g>
+                    </svg>
+                    <div class="query-flow-detail" id="queryFlowDetail">
+                        ${renderFlowStepDetail(null, flow, graph, components)}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function bindQueryFlowEvents(flow, graph, components) {
+            const svg = document.getElementById('query-flow-svg');
+            const detail = document.getElementById('queryFlowDetail');
+            if (!svg || !flow) return;
+
+            const stepById = Object.fromEntries((flow.steps || []).map(s => [s.id, s]));
+
+            function selectFlowStep(id) {
+                selectedFlowStep = id;
+                const step = stepById[id];
+                detail.innerHTML = renderFlowStepDetail(step, flow, graph, components);
+                svg.querySelectorAll('.qf-node').forEach(el => {
+                    el.classList.toggle('selected', el.dataset.flowId === id);
+                });
+            }
+
+            svg.querySelectorAll('.qf-node').forEach(el => {
+                el.addEventListener('click', () => selectFlowStep(el.dataset.flowId));
+            });
+
+            let dragging = false, lastX, lastY;
+            svg.addEventListener('mousedown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+            window.addEventListener('mouseup', () => dragging = false);
+            window.addEventListener('mousemove', e => {
+                if (!dragging) return;
+                queryFlowState.tx += e.clientX - lastX;
+                queryFlowState.ty += e.clientY - lastY;
+                lastX = e.clientX; lastY = e.clientY;
+                const g = document.getElementById('query-flow-root');
+                if (g) g.setAttribute('transform', `translate(${queryFlowState.tx},${queryFlowState.ty}) scale(${queryFlowState.scale})`);
+            });
+            svg.addEventListener('wheel', e => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                queryFlowState.scale = Math.min(2, Math.max(0.4, queryFlowState.scale * delta));
+                const g = document.getElementById('query-flow-root');
+                if (g) g.setAttribute('transform', `translate(${queryFlowState.tx},${queryFlowState.ty}) scale(${queryFlowState.scale})`);
+            }, { passive: false });
+        }
+
+        function layoutMindmap(graph) {
+            const W = 1280, H = 660;
+            const cx = W / 2, cy = H / 2;
+            const positions = {};
+
+            positions.rag_system = { x: cx, y: cy, r: 34 };
+
+            const metrics = graph.nodes.filter(n => n.type === 'metric');
+            const middleware = graph.nodes.filter(n => n.type !== 'metric');
+
+            const groupAngles = {
+                ai: -Math.PI / 2,
+                ai_served: -Math.PI / 6,
+                traditional: Math.PI / 3,
+                app: Math.PI * 0.75,
+                glue: Math.PI * 0.55,
+                ops: Math.PI * 0.9,
+                metrics: Math.PI / 6,
+            };
+            const groupRadius = {
+                ai: 170,
+                ai_served: 240,
+                traditional: 240,
+                app: 120,
+                glue: 120,
+                ops: 320,
+                metrics: 380,
+            };
+
+            ['ai', 'ai_served', 'traditional', 'app', 'glue', 'ops'].forEach(group => {
+                const items = middleware.filter(n => n.group === group);
+                const baseAngle = groupAngles[group] ?? 0;
+                const radius = groupRadius[group] ?? 200;
+                items.forEach((n, i) => {
+                    const spread = Math.min(0.5, 0.18 * Math.max(items.length - 1, 1));
+                    const angle = baseAngle + (i - (items.length - 1) / 2) * (items.length > 1 ? spread / (items.length - 1) : 0);
+                    positions[n.id] = { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius, r: 20 };
+                });
+            });
+
+            metrics.forEach((n, i) => {
+                const angle = groupAngles.metrics + (i - (metrics.length - 1) / 2) * 0.35;
+                const radius = groupRadius.metrics;
+                positions[n.id] = { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius, r: 18 };
+            });
+
+            return { positions, W, H };
+        }
+
+        function nodeById(graph) {
+            const map = Object.fromEntries(graph.nodes.map(n => [n.id, n]));
+            map[graph.root.id] = graph.root;
+            return map;
+        }
+
+        function renderMindmap(graph) {
+            const { positions, W, H } = layoutMindmap(graph);
+            const lookup = nodeById(graph);
+
+            let edgesSvg = '';
+            graph.edges.forEach(e => {
+                const from = positions[e.from];
+                const to = positions[e.to];
+                if (!from || !to) return;
+                const mx = (from.x + to.x) / 2;
+                const my = (from.y + to.y) / 2;
+                edgesSvg += `<path class="graph-edge" data-from="${e.from}" data-to="${e.to}"
+                    d="M${from.x},${from.y} Q${mx},${my} ${to.x},${to.y}" marker-end="url(#arrow)"/>`;
+            });
+
+            let nodesSvg = '';
+            [graph.root, ...graph.nodes].forEach(n => {
+                const pos = positions[n.id];
+                if (!pos) return;
+                const color = n.type === 'outcome' ? GROUP_COLORS.outcome : (GROUP_COLORS[n.group] || GROUP_COLORS.app);
+                const hl = selectedId === n.id ? ' stroke="#fff" stroke-width="3"' : '';
+                nodesSvg += `<g class="graph-node" data-id="${n.id}" transform="translate(${pos.x},${pos.y})">
+                    <circle r="${pos.r}" fill="${color}" fill-opacity="0.28" stroke="${color}"${hl}/>
+                    <text text-anchor="middle" dy="4">${n.label.length > 14 ? n.label.slice(0, 12) + '…' : n.label}</text>
+                </g>`;
+            });
+
+            return `<div class="mindmap-wrap">
+                <div class="mindmap-toolbar">
+                    <span>点击节点查看职责、等价物与指标影响链 — 拖拽平移 / 滚轮缩放</span>
+                    <div class="legend">
+                        <div class="legend-item"><span class="legend-swatch" style="background:#f59e0b"></span>AI 原生</div>
+                        <div class="legend-item"><span class="legend-swatch" style="background:#a855f7"></span>传统·为 AI 服务</div>
+                        <div class="legend-item"><span class="legend-swatch" style="background:#3b82f6"></span>传统互联网</div>
+                        <div class="legend-item"><span class="legend-swatch" style="background:#ef4444"></span>受影响指标</div>
+                    </div>
+                </div>
+                <svg id="mindmap-svg" viewBox="0 0 ${W} ${H}">
+                    <defs>
+                        <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                            <path d="M0,0 L6,3 L0,6 Z" fill="#3d5270"/>
+                        </marker>
+                    </defs>
+                    <g id="graph-root" transform="translate(${graphState.tx},${graphState.ty}) scale(${graphState.scale})">
+                        ${edgesSvg}${nodesSvg}
+                    </g>
+                </svg>
+                <div class="detail-panel" id="graphDetail">点击中间件节点：查看职责、配置项、功能等价物、影响的 L1–L4 指标</div>
+            </div>`;
+        }
+
+        function renderNodeDetail(node, graph, component) {
+            if (!node) return '未找到节点';
+            const tag = aiLabel(node);
+            let html = `<strong>${node.label}</strong>`;
+            html += `<span class="tag ${tag.cls}">${tag.text}</span>`;
+            if (component?.status) html += statusTag(component.status);
+            if (component && !component.active) html += `<span class="tag tag-status-warn">非当前 Profile</span>`;
+            html += `<br>${node.role || ''}`;
+            if (node.config) html += `<br>配置：<code>${node.config}</code>`;
+            if (node.impacts?.length) html += `<br>影响指标：${node.impacts.join('、')}`;
+
+            const incoming = graph.edges.filter(e => e.to === node.id);
+            const outgoing = graph.edges.filter(e => e.from === node.id);
+            const lookup = nodeById(graph);
+            if (incoming.length) {
+                html += '<br>↑ 数据来自：' + incoming.map(e =>
+                    `${lookup[e.from]?.label || e.from}（${e.effect}）`
+                ).join('；');
+            }
+            if (outgoing.length) {
+                html += '<br>↓ 影响：' + outgoing.map(e =>
+                    `${lookup[e.to]?.label || e.to}（${e.effect}）`
+                ).join('；');
+            }
+
+            if (node.alternatives?.length) {
+                html += '<table class="alt-table"><thead><tr><th>等价物</th><th>优点</th><th>缺点</th></tr></thead><tbody>';
+                html += node.alternatives.map(a =>
+                    `<tr><td>${a.name}</td><td>${a.pros}</td><td>${a.cons}</td></tr>`
+                ).join('');
+                html += '</tbody></table>';
+            }
+            return html;
+        }
+
+        function renderComponentCards(components, graph) {
+            return `<div class="component-grid">${(components || []).map(c => {
+                const tag = aiLabel(c);
+                const sel = selectedId === c.id ? ' selected' : '';
+                const inactive = c.active ? '' : ' inactive';
+                return `<div class="component-card${sel}${inactive}" data-id="${c.id}">
+                    <div class="card-header">
+                        <span class="card-title">${c.label}</span>
+                        ${statusTag(c.status)}
+                    </div>
+                    <span class="tag ${tag.cls}">${tag.text}</span>
+                    <div class="card-role">${c.role}</div>
+                </div>`;
+            }).join('')}</div>`;
+        }
+
+        function bindMindmapEvents(graph, components) {
+            const svg = document.getElementById('mindmap-svg');
+            const detail = document.getElementById('graphDetail');
+            if (!svg) return;
+
+            const compById = Object.fromEntries((components || []).map(c => [c.id, c]));
+            const lookup = nodeById(graph);
+
+            function selectNode(id) {
+                selectedId = id;
+                graphState.highlight = id;
+                const node = lookup[id];
+                const comp = compById[id];
+                detail.innerHTML = renderNodeDetail(node, graph, comp);
+                svg.querySelectorAll('.graph-edge').forEach(path => {
+                    const hl = path.dataset.from === id || path.dataset.to === id;
+                    path.classList.toggle('highlight', hl);
+                });
+                document.querySelectorAll('.component-card').forEach(el => {
+                    el.classList.toggle('selected', el.dataset.id === id);
+                });
+            }
+
+            svg.querySelectorAll('.graph-node').forEach(el => {
+                el.addEventListener('click', () => selectNode(el.dataset.id));
+            });
+
+            document.querySelectorAll('.component-card').forEach(el => {
+                el.addEventListener('click', () => selectNode(el.dataset.id));
+            });
+
+            let dragging = false, lastX, lastY;
+            svg.addEventListener('mousedown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+            window.addEventListener('mouseup', () => dragging = false);
+            window.addEventListener('mousemove', e => {
+                if (!dragging) return;
+                graphState.tx += e.clientX - lastX;
+                graphState.ty += e.clientY - lastY;
+                lastX = e.clientX; lastY = e.clientY;
+                const g = document.getElementById('graph-root');
+                if (g) g.setAttribute('transform', `translate(${graphState.tx},${graphState.ty}) scale(${graphState.scale})`);
+            });
+            svg.addEventListener('wheel', e => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                graphState.scale = Math.min(2, Math.max(0.4, graphState.scale * delta));
+                const g = document.getElementById('graph-root');
+                if (g) g.setAttribute('transform', `translate(${graphState.tx},${graphState.ty}) scale(${graphState.scale})`);
+            }, { passive: false });
+        }
+
+        function renderApp() {
+            const data = mapData;
+            if (!data) return;
+            const graph = data.graph;
+            document.getElementById('app').innerHTML = `
+                ${renderProfile(data)}
+                ${renderQueryFlow(data.query_flow, graph, data.components)}
+                <div class="section">
+                    <h2>分类图例</h2>
+                    ${renderCategories(graph.categories)}
+                </div>
+                <div class="section">
+                    <h2>数据流 · 中间件如何串联</h2>
+                    ${renderFlows(data.data_flows)}
+                </div>
+                <div class="section">
+                    <h2>影响思维导图</h2>
+                    ${renderMindmap(graph)}
+                </div>
+                <div class="section">
+                    <h2>组件卡片 · 点击与导图联动</h2>
+                    ${renderComponentCards(data.components, graph)}
+                </div>`;
+            bindQueryFlowEvents(data.query_flow, graph, data.components);
+            bindMindmapEvents(graph, data.components);
+        }
+
+        async function loadMap() {
+            try {
+                const res = await fetch('/api/middleware/map');
+                if (!res.ok) throw new Error(res.statusText);
+                mapData = await res.json();
+                document.getElementById('updatedAt').textContent =
+                    '更新: ' + new Date(mapData.generated_at).toLocaleString('zh-CN');
+                renderApp();
+            } catch (err) {
+                document.getElementById('app').innerHTML =
+                    `<div class="loading" style="color:var(--fail)">加载失败: ${err.message}<br>请确认服务已启动 (make dev)</div>`;
+            }
+        }
+
+        document.getElementById('refreshBtn').addEventListener('click', loadMap);
+        loadMap();
+    </script>
+</body>
+</html>

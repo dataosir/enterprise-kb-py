@@ -2,6 +2,7 @@
 
 > 本文说明如何部署企业知识库配套的中间件栈，适用于飞牛 NAS、Linux 服务器或任何支持 Docker 的环境。  
 > 技术方案背景见 [ENTERPRISE_PLAN.md](./ENTERPRISE_PLAN.md)。  
+> **组件职责与选型对比**见 [`../tech/MIDDLEWARE.md`](../tech/MIDDLEWARE.md)（中间件专题）。  
 > **安全提示：** 本文不包含真实账号密码；凭据仅在本地 `.env` 中配置，勿提交 Git。
 
 ---

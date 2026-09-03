@@ -32,7 +32,8 @@
 1. [`prd/00-product-overview.md`](prd/00-product-overview.md) — 产品定位与功能全景
 2. [`enterprise/ENTERPRISE_PLAN.md`](enterprise/ENTERPRISE_PLAN.md) — Phase 2–6 演进路线
 3. [`enterprise/MIDDLEWARE_SETUP.md`](enterprise/MIDDLEWARE_SETUP.md) — Redis / ES / PG / MinIO 部署
-4. [`enterprise/RAG_EVALUATION.md`](enterprise/RAG_EVALUATION.md) — 切分量化与 RAGAS 指标
+4. [`tech/MIDDLEWARE.md`](tech/MIDDLEWARE.md) — 中间件职责、AI vs 传统、等价物选型
+5. [`enterprise/RAG_EVALUATION.md`](enterprise/RAG_EVALUATION.md) — 切分量化与 RAGAS 指标
 
 ### 迭代开发（按功能号）
 

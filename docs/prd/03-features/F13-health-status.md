@@ -25,7 +25,7 @@
 
 **Out**
 
-- Prometheus metrics 端点
+- Prometheus metrics 端点（见 F12 `/metrics`）
 - 分布式链路追踪
 - 组件级独立 health（/health/redis 等）
 
@@ -56,6 +56,6 @@
 
 ## 8. 已知缺口 / 待迭代
 
-- 无 `/metrics` Prometheus 导出（Phase 6）
+- 无独立 `/metrics` 细分（已由 F12 `GET /metrics` 提供 Prometheus 文本）
 - 无组件延迟分位数
 - Worker 进程健康未纳入（仅 API）

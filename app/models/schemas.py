@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ChatRequest(BaseModel):
@@ -128,4 +128,28 @@ class ReindexResult(BaseModel):
 class EsSyncResult(BaseModel):
     synced_documents: int
     total_chunks: int
+    message: str
+
+
+class FeedbackRequest(BaseModel):
+    rating: str = Field(description="up 或 down")
+    question: str | None = None
+    answer: str | None = None
+    conversation_id: str | None = Field(default=None, alias="conversationId")
+    comment: str | None = None
+    expected_filename: str | None = Field(default=None, alias="expectedFilename")
+
+    model_config = {"populate_by_name": True}
+
+    @field_validator("rating")
+    @classmethod
+    def validate_rating(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"up", "down"}:
+            raise ValueError("rating 必须为 up 或 down")
+        return normalized
+
+
+class FeedbackResponse(BaseModel):
+    id: str
     message: str

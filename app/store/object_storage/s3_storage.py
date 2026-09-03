@@ -45,6 +45,13 @@ class S3ObjectStorage:
     return f"s3://{self.bucket}/{key}"
 
   def resolve_local_path(self, storage_ref: str) -> Path:
+    if not storage_ref.startswith("s3://"):
+      # 兼容 local → s3 切换后 metadata 中仍保留本地路径的历史文档
+      local = Path(storage_ref)
+      if local.is_file():
+        logger.debug("Legacy local storage ref, using existing file: %s", storage_ref)
+        return local
+      raise ValueError(f"Invalid S3 reference: {storage_ref}")
     bucket, key = self._parse_ref(storage_ref)
     suffix = Path(key).suffix or ".bin"
     temp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)

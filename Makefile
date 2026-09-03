@@ -1,4 +1,4 @@
-.PHONY: install dev start package benchmark reset docker-up docker-down worker reset-pg-password
+.PHONY: install dev start package benchmark analyze-chunks eval-smoke eval-check eval-ragas export-bad-cases reset docker-up docker-down worker reset-pg-password
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -23,6 +23,21 @@ package:
 
 benchmark:
 	./scripts/benchmark.sh
+
+analyze-chunks:
+	$(PYTHON) scripts/analyze_chunks.py
+
+eval-smoke:
+	./scripts/eval_smoke.sh
+
+eval-check:
+	$(PYTHON) scripts/check_eval_baseline.py
+
+eval-ragas:
+	$(PYTHON) scripts/eval_ragas.py --dry-run
+
+export-bad-cases:
+	$(PYTHON) scripts/export_bad_cases.py
 
 reset:
 	rm -rf data/chroma data/uploads data/metadata.db

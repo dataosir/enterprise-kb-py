@@ -1,7 +1,159 @@
 [
-  {"question": "退款多久到账？", "expected_filename": "refund-policy.md"},
-  {"question": "购买后几天内可以全额退款？", "expected_filename": "refund-policy.md"},
-  {"question": "远程办公考勤怎么打卡？", "expected_filename": "remote-work-policy.md"},
-  {"question": "VPN 连不上怎么办？", "expected_filename": "it-faq.md"},
-  {"question": "忘记公司邮箱密码怎么办？", "expected_filename": "it-faq.md"}
+  {
+    "question": "退款多久到账？",
+    "expected_filename": "refund-policy.md",
+    "expected_answer": "审核通过后 5~10 个工作日原路退回。",
+    "tags": ["semantic", "faq", "policy", "refund"],
+    "difficulty": "easy"
+  },
+  {
+    "question": "购买后几天内可以全额退款？",
+    "expected_filename": "refund-policy.md",
+    "expected_answer": "购买后 7 个自然日内可申请 100% 全额退款。",
+    "tags": ["semantic", "policy", "refund"],
+    "difficulty": "easy"
+  },
+  {
+    "question": "全额退款需要满足哪些条件？",
+    "expected_filename": "refund-policy.md",
+    "tags": ["semantic", "policy", "refund"],
+    "difficulty": "medium"
+  },
+  {
+    "question": "使用 8 到 30 天可以退多少比例？",
+    "expected_filename": "refund-policy.md",
+    "expected_answer": "8~30 天可退 70%。",
+    "tags": ["semantic", "policy", "refund"],
+    "difficulty": "medium"
+  },
+  {
+    "question": "超过 90 天还能退款吗？",
+    "expected_filename": "refund-policy.md",
+    "expected_answer": "超过 90 天不支持退款，可转为企业账户余额。",
+    "tags": ["semantic", "faq", "refund"],
+    "difficulty": "easy"
+  },
+  {
+    "question": "退款审核需要几个工作日？",
+    "expected_filename": "refund-policy.md",
+    "expected_answer": "客服团队 3 个工作日内完成审核。",
+    "tags": ["keyword", "policy", "refund"],
+    "difficulty": "medium"
+  },
+  {
+    "question": "紧急退款客服热线是多少？",
+    "expected_filename": "refund-policy.md",
+    "expected_answer": "400-888-0001（工作日 9:00-18:00）。",
+    "tags": ["keyword", "refund"],
+    "difficulty": "medium"
+  },
+  {
+    "question": "免费试用期产品适用退款政策吗？",
+    "expected_filename": "refund-policy.md",
+    "tags": ["semantic", "policy", "refund"],
+    "difficulty": "easy"
+  },
+  {
+    "question": "远程办公考勤怎么打卡？",
+    "expected_filename": "remote-work-policy.md",
+    "expected_answer": "每日 9:30 前在钉钉远程打卡。",
+    "tags": ["semantic", "policy", "remote"],
+    "difficulty": "easy"
+  },
+  {
+    "question": "申请远程办公需要满足什么距离条件？",
+    "expected_filename": "remote-work-policy.md",
+    "expected_answer": "居住地距公司 50 公里以上。",
+    "tags": ["keyword", "policy", "remote"],
+    "difficulty": "medium"
+  },
+  {
+    "question": "远程办公最长单次可以申请多少天？",
+    "expected_filename": "remote-work-policy.md",
+    "expected_answer": "最长单次申请周期为 30 天。",
+    "tags": ["semantic", "policy", "remote"],
+    "difficulty": "easy"
+  },
+  {
+    "question": "远程办公核心协作时段是几点到几点？",
+    "expected_filename": "remote-work-policy.md",
+    "expected_answer": "10:00-12:00 和 14:00-17:00 须在线。",
+    "tags": ["keyword", "policy", "remote"],
+    "difficulty": "medium"
+  },
+  {
+    "question": "远程办公每日工作时长要求多少小时？",
+    "expected_filename": "remote-work-policy.md",
+    "expected_answer": "每日工作时长不少于 8 小时。",
+    "tags": ["semantic", "policy", "remote"],
+    "difficulty": "easy"
+  },
+  {
+    "question": "连续 3 天未打卡属于什么违规等级？",
+    "expected_filename": "remote-work-policy.md",
+    "tags": ["semantic", "policy", "remote"],
+    "difficulty": "medium"
+  },
+  {
+    "question": "VPN 连不上怎么办？",
+    "expected_filename": "it-faq.md",
+    "tags": ["semantic", "faq", "it"],
+    "difficulty": "easy"
+  },
+  {
+    "question": "忘记公司邮箱密码怎么办？",
+    "expected_filename": "it-faq.md",
+    "expected_answer": "访问 https://sso.company.com/reset，使用手机号验证重置。",
+    "tags": ["semantic", "faq", "it"],
+    "difficulty": "easy"
+  },
+  {
+    "question": "Cisco AnyConnect 版本要求是多少？",
+    "expected_filename": "it-faq.md",
+    "expected_answer": "Cisco AnyConnect 4.10 及以上版本。",
+    "tags": ["keyword", "it"],
+    "difficulty": "medium"
+  },
+  {
+    "question": "新员工账号什么时候开通？",
+    "expected_filename": "it-faq.md",
+    "expected_answer": "入职日前一天 17:00 前由 HR 系统自动触发开通。",
+    "tags": ["semantic", "faq", "it"],
+    "difficulty": "easy"
+  },
+  {
+    "question": "申请云服务器 ECS 默认配置是什么？",
+    "expected_filename": "it-faq.md",
+    "expected_answer": "默认配置 4C8G，CentOS 7.9，期限最长 90 天。",
+    "tags": ["keyword", "it"],
+    "difficulty": "hard"
+  },
+  {
+    "question": "P0 级故障响应时间是多少？",
+    "expected_filename": "it-faq.md",
+    "expected_answer": "P0 生产系统宕机响应时间 15 分钟。",
+    "tags": ["keyword", "it"],
+    "difficulty": "medium"
+  },
+  {
+    "question": "IT 工单提交地址是什么？",
+    "expected_filename": "it-faq.md",
+    "expected_answer": "https://it.company.com/ticket",
+    "tags": ["keyword", "it"],
+    "difficulty": "medium"
+  },
+  {
+    "question": "内网 GitLab 推荐使用什么镜像地址？",
+    "expected_filename": "it-faq.md",
+    "expected_answer": "git.internal.company.com",
+    "tags": ["keyword", "it"],
+    "difficulty": "hard"
+  },
+  {
+    "question": "试用期 VPN 账号多久会自动锁定？",
+    "expected_filename": "it-faq.md",
+    "expected_answer": "试用期账号 90 天自动锁定。",
+    "tags": ["keyword", "it"],
+    "difficulty": "medium"
+  }
 ]

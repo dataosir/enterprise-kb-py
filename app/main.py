@@ -4,7 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import (
@@ -18,6 +18,8 @@ from app.models import (
     ChatResponse,
     ConversationResponse,
     EsSyncResult,
+    FeedbackRequest,
+    FeedbackResponse,
     HealthResponse,
     IngestResult,
     JobStatusResponse,
@@ -27,8 +29,12 @@ from app.models import (
 )
 from app.models.domain import DocumentRecord
 from app.services import bootstrap_sample_docs, get_rag_engine
+from app.services.eval_dashboard import build_eval_dashboard
+from app.services.middleware_map import build_middleware_map
+from app.observability.metrics import METRICS, record_feedback
 from app.services.arq_pool import close_arq_pool, enqueue_ingest_job
 from app.store import get_document_store
+from app.store.feedback_store import append_feedback
 from app.store.object_storage import get_object_storage
 from app.store.object_storage.factory import s3_status
 from app.store.pg_client import pg_status
@@ -140,6 +146,38 @@ def health() -> HealthResponse:
         storage_status=engine.object_storage.status(),
         s3_status=s3_status(),
     )
+
+
+@app.get("/metrics")
+def metrics() -> PlainTextResponse:
+    return PlainTextResponse(METRICS.render(), media_type="text/plain; version=0.0.4; charset=utf-8")
+
+
+@app.get("/api/eval/dashboard")
+def eval_dashboard() -> dict:
+    return build_eval_dashboard()
+
+
+@app.get("/api/middleware/map")
+def middleware_map() -> dict:
+    engine = get_rag_engine()
+    health_data = health().model_dump(by_alias=True)
+    health_data["rag_settings"] = engine.settings_store.get().to_api_dict()
+    return build_middleware_map(health_data)
+
+
+@app.post("/api/feedback", response_model=FeedbackResponse)
+def submit_feedback(req: FeedbackRequest) -> FeedbackResponse:
+    record = append_feedback(
+        rating=req.rating,
+        question=req.question,
+        answer=req.answer,
+        conversation_id=req.conversation_id,
+        comment=req.comment,
+        expected_filename=req.expected_filename,
+    )
+    record_feedback(req.rating)
+    return FeedbackResponse(id=record["id"], message="反馈已记录")
 
 
 @app.get("/api/documents")

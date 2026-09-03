@@ -161,7 +161,7 @@ make benchmark
 | 指标 | 公式 / 含义 | 需要标注 | 本项目 |
 |------|-------------|----------|--------|
 | **Hit@K** | 期望文档出现在 Top-K 的比例 | `expected_filename` 或 `expected_chunk_id` | ✅ |
-| **MRR** | 第一个正确结果的排名倒数均值 `1/rank` | 同上 | ❌ 待加 |
+| **MRR** | 第一个正确结果的排名倒数均值 `1/rank` | 同上 | ✅ benchmark + baseline |
 | **Recall@K** | 应召回的 chunk 中，Top-K 覆盖比例 | `expected_chunk_ids[]` | ❌ 待加 |
 | **Precision@K** | Top-K 中相关 chunk 占比 | 相关性标注 | ❌ 待加 |
 | **NDCG@K** | 考虑排名位置的加权相关性 | 多级相关性标注 | ❌ 待加 |
@@ -238,12 +238,10 @@ curl "http://127.0.0.1:8081/api/chat/sources?q=退款多久到账"
 
 | 类别 | 指标 | 说明 | 状态 |
 |------|------|------|------|
-| **延迟** | `retrieval_ms` | 检索耗时 | ❌ 待埋点 |
-| | `llm_ms` | 生成耗时 | ❌ 待埋点 |
+| **延迟** | `retrieval_ms` | 检索耗时 | ✅ benchmark + `/metrics` |
+| | `llm_ms` / `generation_ms` | 生成耗时 | ✅ `/metrics` |
 | | `ingest_seconds` | 单文档入库 | ✅ benchmark 有 |
-| **吞吐** | QPS、并发会话数 | 压测 | ❌ |
-| **资源** | `vector_chunk_count` | 向量条目数 | ✅ `/api/health` |
-| | Token 用量 | 成本 | ❌ |
+| **成本** | Token 用量（估算） | `rag_tokens_estimated` | ✅ `/metrics` |
 | **可用性** | `pg_status` / `redis_status` / `es_status` / `s3_status` | 中间件连通 | ✅ `/api/health` |
 | **缓存** | 语义缓存命中率 | Redis | ❌ |
 
@@ -253,8 +251,13 @@ curl "http://127.0.0.1:8081/api/chat/sources?q=退款多久到账"
 
 | 工具 | 命令 | 测什么 | 不测什么 |
 |------|------|--------|----------|
-| `benchmark_rag_params.py` | `make benchmark` | chunk/top_k 网格、hit@1、hit@k | LLM、hybrid、rerank |
-| `benchmark_cases.json` | 编辑用例 | 检索期望文档 | 无 expected_answer |
+| `benchmark_rag_params.py` | `make benchmark` | chunk/top_k 网格、hit@1、hit@k、mrr、多检索模式 | LLM |
+| `check_eval_baseline.py` | `make eval-check` | 对比 baseline.json 门禁 | — |
+| `eval_smoke.sh` | `make eval-smoke` | L1+L2+基线（CI 同款） | LLM |
+| `eval_ragas.py` | `make eval-ragas` / `--run --ragas` | faithfulness、answer_relevancy | 需 API Key + ragas |
+| `export_bad_cases.py` | `make export-bad-cases` | 差评回流候选用例 | — |
+| `benchmark_cases.json` | 编辑用例 | ≥20 条检索期望（含 tags） | — |
+| `/metrics` | curl | Prometheus 延迟/Token/反馈计数 | 无质量分 |
 | `/api/chat/sources` | curl / 页面 | 单次检索预览 | 无批量统计 |
 | `/api/health` | curl | 基础设施状态 | 无质量分数 |
 
@@ -272,7 +275,7 @@ curl "http://127.0.0.1:8081/api/chat/sources?q=退款多久到账"
 | **P3 切分分析脚本** | 3 天 | `scripts/analyze_chunks.py` | 输出块长分布、边界质量报告 |
 | **P4 RAGAS 集成** | 1 周 | `scripts/eval_ragas.py` → `eval_report.json` | faithfulness / answer_relevancy 可回归 |
 | **P5 埋点与看板** | 1 周 | structlog + `/metrics` + Grafana | P99 延迟、每日命中率趋势 |
-| **P6 CI 门禁** | 2 天 | PR 触发 benchmark，低于基线告警 | 防止改坏检索 |
+| **P6 CI 门禁** | 2 天 | PR 触发 `make eval-smoke`，低于基线告警 | ✅ `.github/workflows/eval.yml` |
 
 ### 8.2 目录规划（待新增）
 
@@ -280,16 +283,17 @@ curl "http://127.0.0.1:8081/api/chat/sources?q=退款多久到账"
 scripts/
 ├── benchmark_rag_params.py   # ✅ 已有
 ├── benchmark_cases.json      # ✅ 已有，待扩展 expected_answer
-├── analyze_chunks.py         # P3：切分内在指标
-├── eval_ragas.py             # P4：端到端 RAGAS
-└── eval_report.schema.json   # 报告格式
+├── analyze_chunks.py         # ✅ 切分内在指标
+├── eval_ragas.py             # ✅ L3 脚手架（可选 RAGAS）
+├── check_eval_baseline.py    # ✅ 基线对比
+└── eval_report.schema.json   # 报告格式（待加）
 
 data/
 ├── benchmark/
 │   └── benchmark_rag_params.csv
 └── eval/
     ├── eval_report.json
-    └── baseline.json         # CI 对比基线
+    └── baseline.json         # ✅ CI 对比基线
 ```
 
 ### 8.3 推荐工作流
