@@ -10,7 +10,7 @@
 | 服务 | 容器名 | 默认端口 | 用途 |
 |------|--------|----------|------|
 | Redis 7 | `kb-redis` | **6379** | 会话持久化、限流、任务队列 |
-| PostgreSQL 16 + pgvector | `kb-postgres` | **5433**（映射到容器 5432） | 生产向量库、元数据 |
+| PostgreSQL 16 + pgvector | `kb-postgres` | **5433**（映射到容器 5432） | 生产向量库、元数据（用户 `kb`，密码见 `.env` 中 `POSTGRES_PASSWORD`） |
 | Elasticsearch 8.15 | `kb-elasticsearch` | **9200** | BM25 混合检索 |
 | MinIO | `kb-minio` | **9000**（API）/ **9001**（控制台） | 对象存储 |
 | IK 中文分词 | — | — | ES 中文分词插件（需手动安装） |
@@ -45,14 +45,15 @@
 ### 3.2 启动
 
 ```bash
-# 在项目根目录
-export POSTGRES_PASSWORD='your_secure_pg_password'
-export MINIO_ROOT_PASSWORD='your_secure_minio_password'
+# 在项目根目录（确保已有 .env，密码见 .env.example 企业中间件段）
+cp .env.example .env   # 首次
 
 docker compose -f docker-compose.enterprise.yml pull
 docker compose -f docker-compose.enterprise.yml up -d
 docker compose -f docker-compose.enterprise.yml ps
 ```
+
+Compose 会自动读取根目录 `.env` 中的 `POSTGRES_PASSWORD`、`MINIO_ROOT_PASSWORD` 等变量，与应用共用同一套账号。
 
 ### 3.3 安装 Elasticsearch IK 中文分词（混合检索必做）
 
@@ -75,7 +76,7 @@ docker exec kb-elasticsearch bin/elasticsearch-plugin list
 
 ## 4. 验证清单
 
-将 `YOUR_HOST` 替换为你的 NAS / 服务器内网 IP 或 `127.0.0.1`：
+将 `YOUR_HOST` 替换为你的 NAS / 服务器内网 IP 或 `127.0.0.1`（与 `.env` 中 `MIDDLEWARE_HOST` 一致）：
 
 ```bash
 # Redis
@@ -98,24 +99,31 @@ curl -X POST "http://YOUR_HOST:9200/_analyze" \
 curl http://YOUR_HOST:9000/minio/health/live
 ```
 
-MinIO 控制台：`http://YOUR_HOST:9001`（默认用户 `kbadmin`，密码见 compose 环境变量）
+MinIO 控制台：`http://YOUR_HOST:9001`（用户与密码见 `.env` 中 `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`）
 
 ---
 
 ## 5. 应用侧配置
 
-复制 `.env.enterprise.example` 为本地配置，填入 **YOUR_HOST** 与密码：
+在 `.env` 中取消 `MIDDLEWARE_HOST` 注释并填写地址（本机 `127.0.0.1` 或 NAS 内网 IP）：
 
 ```bash
-REDIS_URL=redis://YOUR_HOST:6379/0
-DATABASE_URL=postgresql://kb:YOUR_PG_PASSWORD@YOUR_HOST:5433/enterprise_kb
-ES_URL=http://YOUR_HOST:9200
-S3_ENDPOINT=http://YOUR_HOST:9000
-S3_ACCESS_KEY=kbadmin
-S3_SECRET_KEY=YOUR_MINIO_PASSWORD
+# .env（账号密码与 compose 共用，见 .env.example 企业中间件段）
+MIDDLEWARE_HOST=127.0.0.1
+
+# PostgreSQL：用户名 kb，默认密码 changeme_pg_password
+POSTGRES_USER=kb
+POSTGRES_PASSWORD=changeme_pg_password
+POSTGRES_DB=enterprise_kb
+POSTGRES_HOST_PORT=5433
+
+MINIO_ROOT_USER=kbadmin
+MINIO_ROOT_PASSWORD=changeme_minio_password
 ```
 
-> **安全提示：** 请勿将真实密码、内网 IP 提交到公开 Git 仓库。生产环境请为 ES / MinIO / PG 开启认证。
+应用会根据 `MIDDLEWARE_HOST` 自动拼接 `REDIS_URL`、`DATABASE_URL`、`ES_URL`、`S3_*` 等连接串。如需单独覆盖某项，可直接写对应的 `REDIS_URL` 等变量。
+
+MinIO 控制台：`http://<MIDDLEWARE_HOST>:9001`（用户 `MINIO_ROOT_USER`，密码 `MINIO_ROOT_PASSWORD`）
 
 > 当前 Demo 应用仍默认使用 Chroma + SQLite；上述变量供 **Phase 2b–4** 开发对接时使用。
 
@@ -170,4 +178,16 @@ docker compose -f docker-compose.enterprise.yml down -v
 | Phase 2a | 调参面板 + Rerank + 阈值过滤 | 无 |
 | Phase 2b | ES 混合检索 | Elasticsearch + IK |
 | Phase 3 | Redis 会话 + 异步入库 | Redis |
-| Phase 4 | pgvector 向量库 + MinIO 文件 | PostgreSQL + MinIO |
+| Phase 4 | pgvector 向量库 + MinIO 文件 ✅ | PostgreSQL + MinIO |
+
+### 启用 Phase 4（pgvector + MinIO）
+
+在 `.env` 中追加（或通过 `MIDDLEWARE_HOST` 自动拼接，见 `.env.example`）：
+
+```bash
+VECTOR_STORE=pgvector
+STORAGE_BACKEND=s3
+# DATABASE_URL / S3_* 由 MIDDLEWARE_HOST + 密码自动拼接，或手动指定
+```
+
+首次切换向量库后，在页面侧栏点击 **「重建索引」**，将 Chroma 中的片段迁移到 PostgreSQL。

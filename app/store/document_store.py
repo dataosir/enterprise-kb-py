@@ -93,6 +93,20 @@ class DocumentStore:
             )
             return cursor.rowcount > 0
 
+    def update_status(self, doc_id: str, status: str, chunk_count: int | None = None) -> bool:
+        with self._connect() as conn:
+            if chunk_count is not None:
+                cursor = conn.execute(
+                    "UPDATE documents SET status = ?, chunk_count = ? WHERE id = ?",
+                    (status, chunk_count, doc_id),
+                )
+            else:
+                cursor = conn.execute(
+                    "UPDATE documents SET status = ? WHERE id = ?",
+                    (status, doc_id),
+                )
+            return cursor.rowcount > 0
+
     @staticmethod
     def _row_to_record(row: sqlite3.Row) -> DocumentRecord:
         return DocumentRecord(

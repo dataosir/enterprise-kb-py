@@ -135,16 +135,40 @@ static/                  # Web UI
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
-| `/api/health` | GET | 服务状态 + 文档统计 |
+| `/api/health` | GET | 服务状态 + 文档统计 + Redis/ES 状态 |
 | `/api/documents` | GET | 文档列表 |
-| `/api/documents/upload` | POST | 上传文档 |
+| `/api/documents/upload` | POST | 上传文档（大文件可异步入库） |
 | `/api/documents/{id}` | DELETE | 删除文档 |
+| `/api/jobs/{id}` | GET | 异步入库任务状态（需 Redis） |
 | `/api/chat` | POST | 问答 |
 | `/api/chat/stream` | GET | SSE 流式问答 |
 | `/api/chat/sources` | GET | 检索预览 |
 | `/api/chat/conversation` | POST | 创建会话 |
+| `/api/conversations/{id}` | GET | 获取会话历史（Redis 持久化） |
+| `/api/conversations/{id}` | DELETE | 清空会话 |
 
 完整 API 文档：http://localhost:8081/docs
+
+### Phase 3：Redis 会话 + 异步入库
+
+配置 Redis 后（在 `.env` 设置 `MIDDLEWARE_HOST` 或 `REDIS_URL`，见 `.env.example`）：
+
+```bash
+# .env 示例
+MIDDLEWARE_HOST=127.0.0.1
+
+# 终端 1：API 服务
+make dev
+
+# 终端 2：异步入库 Worker（低内存设备 max_jobs=1）
+make worker
+```
+
+- **会话持久化**：对话历史写入 Redis，重启不丢失（`CONVERSATION_STORE=auto`）
+- **异步入库**：≥ `ASYNC_INGEST_THRESHOLD_MB`（默认 1MB）的文件后台处理，上传立即返回
+- **任务查询**：`GET /api/jobs/{jobId}` 或页面自动轮询
+
+未配置 Redis 时自动回退为内存会话 + 同步入库，Demo 仍可正常运行。
 
 ## 重置知识库
 
@@ -168,8 +192,9 @@ make benchmark
 ```
 Week 1                              Week 2
 ────────                            ────────
-✅ RAG 基础闭环                      → BM25 + 向量混合检索
-✅ 调 chunk / topK                  → Cross-Encoder Rerank
+✅ RAG 基础闭环                      → BM25 + 向量混合检索 ✅
+✅ 调 chunk / topK                  → Cross-Encoder Rerank ✅
+✅ Redis 会话 + 异步入库             ✅ pgvector + MinIO
 → Query 改写 HyDE                   → LangGraph 多步检索
 → RAGAS 评估                        → 方案迁回 Java 版
 ```

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Iterator
 from uuid import uuid4
 
-from langchain_chroma import Chroma
 from langchain_community.document_loaders import Docx2txtLoader, PyPDFLoader, TextLoader
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
@@ -16,20 +15,22 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.config import (
     CHAT_MODEL,
-    CHROMA_DIR,
     DEFAULT_SYSTEM_PROMPT,
     EMBEDDING_MODEL,
     EMBEDDING_PROVIDER,
     LOCAL_EMBEDDING_MODEL,
     OPENAI_API_KEY,
     OPENAI_BASE_URL,
-    UPLOAD_DIR,
 )
+from app.services.vector_store.factory import create_vector_store
+from app.store.object_storage.factory import get_object_storage
+from app.store.object_storage.paths import open_document_path
 from app.models.domain import DocumentRecord, RetrievedChunk
 from app.services.retrieval.context_builder import build_context
 from app.services.retrieval.es_store import ElasticsearchStore, get_es_store
 from app.services.retrieval.hybrid import fuse_hybrid_results
 from app.services.retrieval.reranker import Reranker
+from app.store.conversation_store import ConversationStore, get_conversation_store
 from app.store.document_store import DocumentStore, get_document_store
 from app.store.rag_settings import RagSettingsStore, get_rag_settings_store
 
@@ -44,13 +45,14 @@ class RagEngine:
         doc_store: DocumentStore | None = None,
         settings_store: RagSettingsStore | None = None,
         es_store: ElasticsearchStore | None = None,
+        conversation_store: ConversationStore | None = None,
     ) -> None:
         self.doc_store = doc_store or get_document_store()
         self.settings_store = settings_store or get_rag_settings_store()
         self.es_store = es_store if es_store is not None else get_es_store()
+        self.conversation_store = conversation_store or get_conversation_store()
+        self.object_storage = get_object_storage()
         self._reranker = Reranker()
-        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 
         if EMBEDDING_PROVIDER == "openai":
             embed_kwargs: dict[str, Any] = {
@@ -67,21 +69,21 @@ class RagEngine:
                 encode_kwargs={"normalize_embeddings": True},
             )
 
-        self.vectorstore = Chroma(
-            collection_name="enterprise_kb",
-            embedding_function=self.embeddings,
-            persist_directory=str(CHROMA_DIR),
-        )
+        self.vectorstore = create_vector_store(self.embeddings)
         self._refresh_splitter()
         self._refresh_llm()
         self._refresh_prompt()
-        self._memory: dict[str, list[tuple[str, str]]] = {}
 
     def get_settings(self) -> dict:
         data = self.settings_store.get().to_api_dict()
         data["esEnabled"] = self.es_store.enabled
         data["esStatus"] = self.es_store.status()
         data["esChunkCount"] = self.es_store.count() if self.es_store.available else 0
+        data["vectorStore"] = self.vectorstore.backend
+        data["vectorStatus"] = self.vectorstore.status()
+        data["vectorChunkCount"] = self.vector_count()
+        data["storageBackend"] = self.object_storage.backend
+        data["storageStatus"] = self.object_storage.status()
         return data
 
     def update_settings(
@@ -131,6 +133,11 @@ class RagEngine:
             "esEnabled": self.es_store.enabled,
             "esStatus": self.es_store.status(),
             "esChunkCount": self.es_store.count() if self.es_store.available else 0,
+            "vectorStore": self.vectorstore.backend,
+            "vectorStatus": self.vectorstore.status(),
+            "vectorChunkCount": self.vector_count(),
+            "storageBackend": self.object_storage.backend,
+            "storageStatus": self.object_storage.status(),
         }
 
     def reindex_all(self) -> dict:
@@ -139,13 +146,12 @@ class RagEngine:
         reindexed = 0
 
         for record in records:
-            path = Path(record.file_path)
-            if not path.exists():
+            if not self._document_file_available(record.file_path):
                 logger.warning("Skip reindex, file missing: %s", record.file_path)
                 continue
 
-            self.vectorstore.delete(where={"doc_id": record.id})
-            chunk_count = self._ingest_chunks(path, record.filename, record.id)
+            self.vectorstore.delete_by_doc_id(record.id)
+            chunk_count = self._ingest_chunks(record.file_path, record.filename, record.id)
             self.doc_store.update_chunk_count(record.id, chunk_count)
             total_chunks += chunk_count
             reindexed += 1
@@ -176,7 +182,7 @@ class RagEngine:
 
     def ingest_file(
         self,
-        file_path: Path,
+        storage_ref: str | Path,
         filename: str,
         doc_id: str | None = None,
         *,
@@ -184,22 +190,29 @@ class RagEngine:
         persist_metadata: bool = True,
     ) -> int:
         doc_id = doc_id or str(uuid4())
-        size = file_size if file_size is not None else file_path.stat().st_size
+        storage_ref_str = str(storage_ref)
+        if file_size is not None:
+            size = file_size
+        elif storage_ref_str.startswith("s3://"):
+            raise ValueError("file_size is required for S3 storage references")
+        else:
+            size = Path(storage_ref_str).stat().st_size
 
         try:
-            docs = self._load_documents(file_path, filename)
-            for doc in docs:
-                doc.metadata["doc_id"] = doc_id
-                doc.metadata["filename"] = filename
+            with open_document_path(storage_ref_str) as local_path:
+                docs = self._load_documents(local_path, filename)
+                for doc in docs:
+                    doc.metadata["doc_id"] = doc_id
+                    doc.metadata["filename"] = filename
 
-            chunks = self.splitter.split_documents(docs)
+                chunks = self.splitter.split_documents(docs)
             if not chunks:
                 if persist_metadata:
                     self.doc_store.add(
                         DocumentRecord(
                             id=doc_id,
                             filename=filename,
-                            file_path=str(file_path),
+                            file_path=storage_ref_str,
                             file_size=size,
                             chunk_count=0,
                             status="FAILED",
@@ -218,7 +231,7 @@ class RagEngine:
                     DocumentRecord(
                         id=doc_id,
                         filename=filename,
-                        file_path=str(file_path),
+                        file_path=storage_ref_str,
                         file_size=size,
                         chunk_count=len(chunks),
                         status="READY",
@@ -236,7 +249,7 @@ class RagEngine:
                     DocumentRecord(
                         id=doc_id,
                         filename=filename,
-                        file_path=str(file_path),
+                        file_path=storage_ref_str,
                         file_size=size,
                         chunk_count=0,
                         status="FAILED",
@@ -245,18 +258,43 @@ class RagEngine:
                 )
             raise
 
+    def process_document_ingest(self, doc_id: str) -> int:
+        """处理已上传文档的入库（供异步入库 Worker 调用）。"""
+        record = self.doc_store.get(doc_id)
+        if not record:
+            raise ValueError(f"Document not found: {doc_id}")
+
+        if not self._document_file_available(record.file_path):
+            self.doc_store.update_status(doc_id, "FAILED", chunk_count=0)
+            raise FileNotFoundError(f"File missing: {record.file_path}")
+
+        self.doc_store.update_status(doc_id, "PROCESSING")
+        try:
+            self.vectorstore.delete_by_doc_id(doc_id)
+            chunk_count = self._ingest_chunks(record.file_path, record.filename, doc_id)
+            if chunk_count == 0:
+                self.doc_store.update_status(doc_id, "FAILED", chunk_count=0)
+                return 0
+
+            self.doc_store.update_chunk_count(doc_id, chunk_count, status="READY")
+            self.settings_store.mark_indexed()
+            logger.info("Processed ingest for %s: %d chunks", record.filename, chunk_count)
+            return chunk_count
+        except Exception:
+            self.doc_store.update_status(doc_id, "FAILED", chunk_count=0)
+            raise
+
     def delete_document(self, doc_id: str) -> bool:
         record = self.doc_store.get(doc_id)
         if not record:
             return False
 
-        self.vectorstore.delete(where={"doc_id": doc_id})
+        self.vectorstore.delete_by_doc_id(doc_id)
         self.es_store.delete_by_doc_id(doc_id)
         self.doc_store.delete(doc_id)
 
-        file_path = Path(record.file_path)
-        if file_path.exists() and file_path.parent == UPLOAD_DIR:
-            file_path.unlink(missing_ok=True)
+        if self.object_storage.is_managed_upload(record.file_path):
+            self.object_storage.delete(record.file_path)
 
         logger.info("Deleted document %s (%s)", doc_id, record.filename)
         return True
@@ -352,23 +390,29 @@ class RagEngine:
         self._append_memory(conversation_id, question, full_answer)
 
     def vector_count(self) -> int:
-        return self.vectorstore._collection.count()
+        return self.vectorstore.count()
 
-    def _ingest_chunks(self, file_path: Path, filename: str, doc_id: str) -> int:
+    def _document_file_available(self, storage_ref: str) -> bool:
+        if storage_ref.startswith("s3://"):
+            return True
+        return Path(storage_ref).exists()
+
+    def _ingest_chunks(self, storage_ref: str, filename: str, doc_id: str) -> int:
         self.es_store.delete_by_doc_id(doc_id)
-        docs = self._load_documents(file_path, filename)
-        for doc in docs:
-            doc.metadata["doc_id"] = doc_id
-            doc.metadata["filename"] = filename
+        with open_document_path(storage_ref) as file_path:
+            docs = self._load_documents(file_path, filename)
+            for doc in docs:
+                doc.metadata["doc_id"] = doc_id
+                doc.metadata["filename"] = filename
 
-        chunks = self.splitter.split_documents(docs)
-        if not chunks:
-            return 0
+            chunks = self.splitter.split_documents(docs)
+            if not chunks:
+                return 0
 
-        self._assign_chunk_ids(chunks)
-        self.vectorstore.add_documents(chunks)
-        self.es_store.index_chunks(chunks)
-        return len(chunks)
+            self._assign_chunk_ids(chunks)
+            self.vectorstore.add_documents(chunks)
+            self.es_store.index_chunks(chunks)
+            return len(chunks)
 
     @staticmethod
     def _assign_chunk_ids(chunks: list[Document]) -> None:
@@ -421,7 +465,7 @@ class RagEngine:
 
     def _format_history(self, conversation_id: str) -> str:
         settings = self.settings_store.get()
-        turns = self._memory.get(conversation_id, [])
+        turns = self.conversation_store.get_turns(conversation_id)
         if not turns or settings.history_turns <= 0:
             return "（无）"
         return "\n".join(
@@ -429,7 +473,7 @@ class RagEngine:
         )
 
     def _append_memory(self, conversation_id: str, question: str, answer: str) -> None:
-        self._memory.setdefault(conversation_id, []).append((question, answer))
+        self.conversation_store.append_turn(conversation_id, question, answer)
 
     @staticmethod
     def _truncate(text: str, max_len: int) -> str:

@@ -7,19 +7,34 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.config import BASE_DIR, MAX_UPLOAD_SIZE_MB
+from app.config import (
+    ASYNC_INGEST,
+    ASYNC_INGEST_THRESHOLD_MB,
+    BASE_DIR,
+    MAX_UPLOAD_SIZE_MB,
+)
 from app.models import (
     ChatRequest,
     ChatResponse,
+    ConversationResponse,
     EsSyncResult,
     HealthResponse,
     IngestResult,
+    JobStatusResponse,
     RagSettingsUpdate,
     ReindexResult,
     RetrievedChunk,
 )
+from app.models.domain import DocumentRecord
 from app.services import bootstrap_sample_docs, get_rag_engine
+from app.services.arq_pool import close_arq_pool, enqueue_ingest_job
 from app.store import get_document_store
+from app.store.object_storage import get_object_storage
+from app.store.object_storage.factory import s3_status
+from app.store.pg_client import pg_status
+from app.store.conversation_store import conversation_store_type, get_conversation_store
+from app.store.job_store import get_job_store
+from app.store.redis_client import redis_status
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -30,6 +45,7 @@ async def lifespan(_: FastAPI):
     engine = get_rag_engine()
     bootstrap_sample_docs(engine)
     yield
+    await close_arq_pool()
 
 
 app = FastAPI(
@@ -94,9 +110,17 @@ def health() -> HealthResponse:
     engine = get_rag_engine()
     settings = engine.settings_store.get()
     es_store = engine.es_store
-    stack = "FastAPI + LangChain + Chroma"
+    stack = "FastAPI + LangChain"
+    if engine.vectorstore.backend == "pgvector":
+        stack += " + pgvector"
+    else:
+        stack += " + Chroma"
+    if redis_status() == "connected":
+        stack += " + Redis"
     if es_store.enabled:
         stack += " + Elasticsearch"
+    if engine.object_storage.backend == "s3":
+        stack += " + MinIO"
     return HealthResponse(
         status="UP",
         stack=stack,
@@ -105,6 +129,16 @@ def health() -> HealthResponse:
         es_enabled=es_store.enabled,
         es_status=es_store.status(),
         retrieval_mode=settings.retrieval_mode,
+        redis_status=redis_status(),
+        conversation_store=conversation_store_type(),
+        async_ingest_enabled=ASYNC_INGEST and redis_status() == "connected",
+        vector_store=engine.vectorstore.backend,
+        vector_status=engine.vectorstore.status(),
+        vector_chunk_count=engine.vector_count(),
+        pg_status=pg_status(),
+        storage_backend=engine.object_storage.backend,
+        storage_status=engine.object_storage.status(),
+        s3_status=s3_status(),
     )
 
 
@@ -153,9 +187,39 @@ def new_conversation() -> dict[str, str]:
     return {"conversationId": str(uuid4())}
 
 
+@app.get("/api/conversations/{conversation_id}", response_model=ConversationResponse)
+def get_conversation(conversation_id: str) -> ConversationResponse:
+    store = get_conversation_store()
+    return ConversationResponse(
+        conversation_id=conversation_id,
+        messages=store.get_messages(conversation_id),
+    )
+
+
+@app.delete("/api/conversations/{conversation_id}")
+def clear_conversation(conversation_id: str) -> dict[str, str]:
+    cleared = get_conversation_store().clear(conversation_id)
+    if not cleared:
+        raise HTTPException(status_code=404, detail="Conversation not found or already empty")
+    return {"message": "会话已清空"}
+
+
+@app.get("/api/jobs/{job_id}", response_model=JobStatusResponse)
+def get_job_status(job_id: str) -> JobStatusResponse:
+    if redis_status() != "connected":
+        raise HTTPException(status_code=503, detail="Redis 未配置或不可用")
+    job = get_job_store().get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    data = get_job_store().to_api_dict(job)
+    return JobStatusResponse(**data)
+
+
 @app.post("/api/documents/upload", response_model=IngestResult)
 async def upload_document(file: UploadFile = File(...)) -> IngestResult:
-    from app.config import UPLOAD_DIR
+    from datetime import datetime, timezone
+
+    storage = get_object_storage()
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="文件名不能为空")
@@ -170,17 +234,52 @@ async def upload_document(file: UploadFile = File(...)) -> IngestResult:
 
     doc_id = str(uuid4())
     filename = Path(file.filename).name
-    saved_path = UPLOAD_DIR / f"{doc_id}_{filename}"
+    storage_ref = storage.put_upload(doc_id, filename, content)
 
-    with saved_path.open("wb") as out:
-        out.write(content)
+    use_async = (
+        ASYNC_INGEST
+        and redis_status() == "connected"
+        and len(content) >= ASYNC_INGEST_THRESHOLD_MB * 1024 * 1024
+    )
+
+    if use_async:
+        get_document_store().add(
+            DocumentRecord(
+                id=doc_id,
+                filename=filename,
+                file_path=storage_ref,
+                file_size=len(content),
+                chunk_count=0,
+                status="PROCESSING",
+                created_at=datetime.now(timezone.utc),
+            )
+        )
+        try:
+            job_store = get_job_store()
+            job_id = job_store.create(doc_id, filename)
+            enqueued = await enqueue_ingest_job(doc_id, job_id)
+            if not enqueued:
+                raise RuntimeError("任务入队失败")
+        except Exception as exc:
+            storage.delete(storage_ref)
+            get_document_store().delete(doc_id)
+            raise HTTPException(status_code=500, detail=f"异步入库任务创建失败: {exc}") from exc
+
+        return IngestResult(
+            doc_id=doc_id,
+            filename=filename,
+            chunk_count=0,
+            status="PROCESSING",
+            message="文档已接收，正在后台入库（可查询任务状态）",
+            job_id=job_id,
+        )
 
     try:
         chunk_count = get_rag_engine().ingest_file(
-            saved_path, filename, doc_id, file_size=len(content)
+            storage_ref, filename, doc_id, file_size=len(content)
         )
     except Exception as exc:
-        saved_path.unlink(missing_ok=True)
+        storage.delete(storage_ref)
         raise HTTPException(status_code=500, detail=f"文档入库失败: {exc}") from exc
 
     return IngestResult(

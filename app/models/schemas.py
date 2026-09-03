@@ -13,11 +13,35 @@ class ChatResponse(BaseModel):
 
 
 class IngestResult(BaseModel):
-    doc_id: str
+    doc_id: str = Field(alias="docId")
     filename: str
-    chunk_count: int
+    chunk_count: int = Field(alias="chunkCount")
     status: str
     message: str
+    job_id: str | None = Field(default=None, alias="jobId")
+
+    model_config = {"populate_by_name": True}
+
+
+class JobStatusResponse(BaseModel):
+    job_id: str = Field(alias="jobId")
+    doc_id: str | None = Field(default=None, alias="docId")
+    filename: str | None = None
+    status: str
+    chunk_count: int = Field(alias="chunkCount", default=0)
+    message: str | None = None
+    error: str | None = None
+    created_at: str | None = Field(default=None, alias="createdAt")
+    updated_at: str | None = Field(default=None, alias="updatedAt")
+
+    model_config = {"populate_by_name": True}
+
+
+class ConversationResponse(BaseModel):
+    conversation_id: str = Field(alias="conversationId")
+    messages: list[dict]
+
+    model_config = {"populate_by_name": True}
 
 
 class HealthResponse(BaseModel):
@@ -28,6 +52,18 @@ class HealthResponse(BaseModel):
     es_enabled: bool = Field(alias="esEnabled")
     es_status: str = Field(alias="esStatus")
     retrieval_mode: str = Field(alias="retrievalMode")
+    redis_status: str = Field(alias="redisStatus", default="not_configured")
+    conversation_store: str = Field(alias="conversationStore", default="memory")
+    async_ingest_enabled: bool = Field(alias="asyncIngestEnabled", default=False)
+    vector_store: str = Field(alias="vectorStore", default="chroma")
+    vector_status: str = Field(alias="vectorStatus", default="connected")
+    vector_chunk_count: int = Field(alias="vectorChunkCount", default=0)
+    pg_status: str = Field(alias="pgStatus", default="not_configured")
+    storage_backend: str = Field(alias="storageBackend", default="local")
+    storage_status: str = Field(alias="storageStatus", default="connected")
+    s3_status: str = Field(alias="s3Status", default="not_configured")
+
+    model_config = {"populate_by_name": True}
 
 
 class RagSettingsResponse(BaseModel):
@@ -53,6 +89,11 @@ class RagSettingsResponse(BaseModel):
     es_enabled: bool = Field(alias="esEnabled")
     es_status: str = Field(alias="esStatus")
     es_chunk_count: int = Field(alias="esChunkCount", ge=0)
+    vector_store: str = Field(alias="vectorStore", default="chroma")
+    vector_status: str = Field(alias="vectorStatus", default="connected")
+    vector_chunk_count: int = Field(alias="vectorChunkCount", default=0)
+    storage_backend: str = Field(alias="storageBackend", default="local")
+    storage_status: str = Field(alias="storageStatus", default="connected")
 
     model_config = {"populate_by_name": True}
 

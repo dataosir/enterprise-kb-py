@@ -91,6 +91,8 @@
         .doc-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .doc-item .meta { font-size: 11px; color: var(--muted); }
         .doc-item .status-ready { color: var(--success); }
+        .doc-item .status-processing { color: #f59e0b; }
+        .doc-item .status-failed { color: #ef4444; }
         .chat-area {
             flex: 1;
             display: flex;
@@ -329,6 +331,10 @@
                     <div class="field-row" id="esStatusRow">
                         <span>ES 状态：<strong id="esStatusText">-</strong></span>
                     </div>
+                    <div class="field-row" id="infraStatusRow">
+                        <span>向量库：<strong id="vectorStoreText">-</strong></span>
+                        <span>存储：<strong id="storageBackendText">-</strong></span>
+                    </div>
                     <div class="field">
                         <label>Top-K <span class="value" id="topKValue">4</span></label>
                         <input type="range" id="topKInput" min="1" max="10" step="1" value="4">
@@ -547,8 +553,17 @@
             document.getElementById('rrfKInput').value = settings.rrfK ?? 60;
             document.getElementById('rrfKValue').textContent = settings.rrfK ?? 60;
             updateEsStatus(settings);
+            updateInfraStatus(settings);
             syncRetrievalMode();
             updateSettingsHint(settings);
+        }
+
+        function updateInfraStatus(settings) {
+            const vectorEl = document.getElementById('vectorStoreText');
+            const storageEl = document.getElementById('storageBackendText');
+            const vectorCount = settings.vectorChunkCount ?? 0;
+            vectorEl.textContent = `${settings.vectorStore || 'chroma'} / ${settings.vectorStatus || 'connected'} (${vectorCount})`;
+            storageEl.textContent = `${settings.storageBackend || 'local'} / ${settings.storageStatus || 'connected'}`;
         }
 
         function updateEsStatus(settings) {
@@ -702,10 +717,17 @@
                 const res = await fetch('/api/health');
                 const data = await res.json();
                 document.getElementById('status').textContent =
-                    `已就绪 ${data.ready_documents}/${data.documents} 篇 · ${data.retrievalMode} · ES:${data.esStatus}`;
+                    `已就绪 ${data.ready_documents}/${data.documents} 篇 · ${data.retrievalMode} · Vector:${data.vectorStore}/${data.vectorStatus} · Storage:${data.storageBackend} · ES:${data.esStatus} · Redis:${data.redisStatus}`;
             } catch {
                 document.getElementById('status').textContent = '服务未连接';
             }
+        }
+
+        function statusClass(status) {
+            if (status === 'READY') return 'status-ready';
+            if (status === 'PROCESSING' || status === 'PENDING') return 'status-processing';
+            if (status === 'FAILED') return 'status-failed';
+            return '';
         }
 
         async function loadDocuments() {
@@ -718,9 +740,36 @@
                         <div class="name">${d.filename}</div>
                         <div class="meta">${d.chunkCount} 片段 · ${formatSize(d.fileSize)}</div>
                     </div>
-                    <span class="${d.status === 'READY' ? 'status-ready' : ''}">${d.status}</span>
+                    <span class="${statusClass(d.status)}">${d.status}</span>
                 </div>
             `).join('') || '<div style="padding:16px;color:#8b9cb3;font-size:13px">暂无文档</div>';
+            return docs;
+        }
+
+        async function pollJobUntilDone(jobId) {
+            const maxAttempts = 120;
+            for (let i = 0; i < maxAttempts; i++) {
+                await new Promise(r => setTimeout(r, 2000));
+                try {
+                    const res = await fetch(`/api/jobs/${jobId}`);
+                    if (!res.ok) continue;
+                    const job = await res.json();
+                    if (job.status === 'COMPLETED') {
+                        addMessage(job.message, 'bot');
+                        await loadDocuments();
+                        await loadHealth();
+                        return;
+                    }
+                    if (job.status === 'FAILED') {
+                        addMessage(`入库失败: ${job.error || job.message}`, 'bot');
+                        await loadDocuments();
+                        return;
+                    }
+                } catch {
+                    // retry
+                }
+            }
+            addMessage('入库任务超时，请稍后刷新文档列表', 'bot');
         }
 
         function formatSize(bytes) {
@@ -786,9 +835,16 @@
             try {
                 const res = await fetch('/api/documents/upload', { method: 'POST', body: formData });
                 const data = await res.json();
+                if (!res.ok) {
+                    addMessage(data.detail || '上传失败', 'bot');
+                    return;
+                }
                 addMessage(data.message, 'bot');
                 await loadDocuments();
                 await loadHealth();
+                if (data.status === 'PROCESSING' && data.jobId) {
+                    pollJobUntilDone(data.jobId);
+                }
             } catch {
                 addMessage('上传失败', 'bot');
             }

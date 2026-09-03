@@ -1,4 +1,4 @@
-.PHONY: install dev start package benchmark reset docker-up docker-down
+.PHONY: install dev start package benchmark reset docker-up docker-down worker reset-pg-password
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -11,6 +11,9 @@ install:
 
 dev:
 	$(VENV)/bin/uvicorn app.main:app --reload --port 8081
+
+worker:
+	./scripts/worker.sh
 
 start:
 	./start.sh
@@ -29,3 +32,7 @@ docker-up:
 
 docker-down:
 	docker compose down
+
+# 在 NAS 上执行：重置 kb-postgres 密码为 .env 中 POSTGRES_PASSWORD
+reset-pg-password:
+	./scripts/reset-pg-password.sh

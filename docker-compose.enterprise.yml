@@ -1,4 +1,5 @@
 # 企业级知识库中间件栈（独立于应用，可单独部署到 NAS / 服务器）
+# 账号密码统一在 .env 维护（从 .env.example 复制），本文件自动读取
 # 用法: docker compose -f docker-compose.enterprise.yml up -d
 
 services:
@@ -25,14 +26,14 @@ services:
       # 宿主机 5432 常被系统 PostgreSQL 占用，默认映射到 5433
       - "${POSTGRES_HOST_PORT:-5433}:5432"
     environment:
-      POSTGRES_DB: enterprise_kb
-      POSTGRES_USER: kb
+      POSTGRES_DB: ${POSTGRES_DB:-enterprise_kb}
+      POSTGRES_USER: ${POSTGRES_USER:-kb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_pg_password}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./scripts/init-pgvector.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kb -d enterprise_kb"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kb} -d ${POSTGRES_DB:-enterprise_kb}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -47,7 +48,7 @@ services:
       discovery.type: single-node
       xpack.security.enabled: "false"
       # 飞牛 NAS 内存有限，默认 256MB 堆；内存充足可改为 -Xms512m -Xmx512m
-      ES_JAVA_OPTS: "${ES_JAVA_OPTS:--Xms256m -Xmx256m}"
+      ES_JAVA_OPTS: "${ES_JAVA_OPTS}"
       bootstrap.memory_lock: "false"
     volumes:
       - esdata:/usr/share/elasticsearch/data
@@ -70,8 +71,8 @@ services:
       - "9000:9000"
       - "9001:9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-kbadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-changeme_minio_password}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
