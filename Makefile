@@ -1,4 +1,4 @@
-.PHONY: install dev start package benchmark analyze-chunks eval-smoke eval-check eval-ragas export-bad-cases reset docker-up docker-down worker reset-pg-password
+.PHONY: install dev start package benchmark analyze-chunks eval-smoke eval-check eval-ragas export-bad-cases reset docker-up docker-down worker reset-pg-password test
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -7,7 +7,11 @@ PIP := $(VENV)/bin/pip
 install:
 	python3 -m venv $(VENV)
 	$(PIP) install -r requirements.txt
+	$(PIP) install -r requirements-dev.txt
 	@test -f .env || cp .env.example .env
+
+test:
+	$(PYTHON) -m pytest tests/ -q
 
 dev:
 	$(VENV)/bin/uvicorn app.main:app --reload --port 8081

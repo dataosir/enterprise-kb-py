@@ -4,7 +4,7 @@
 
 企业内网部署需要身份认证、租户隔离与审计。当前 Demo 无鉴权，任意访问者可上传/删除/调参。Phase 5 规划 JWT/OIDC 与 `tenant_id` 贯穿存储与检索。
 
-> **状态：📋 规划中**，详见 [`../../enterprise/ENTERPRISE_PLAN.md`](../../enterprise/ENTERPRISE_PLAN.md) Phase 5。
+> **状态：🟡 部分完成** — 认证中间件与审计已落地；租户数据隔离待补。详见 [`../../tech/BACKLOG.md`](../../tech/BACKLOG.md)。
 
 ## 2. 用户故事 / 场景
 
@@ -47,20 +47,21 @@ Request → JWT 校验 → 解析 tenant_id + roles
 | `JWT_SECRET` | 本地 JWT 签名 |
 | `DEFAULT_TENANT` | Demo 默认租户 |
 
-## 6. 代码锚点（待建）
+## 6. 代码锚点
 
-- `app/middleware/auth.py` — 待实现
-- `app/store/audit_log.py` — 待实现
+- `app/middleware/auth.py` — Bearer Token 中间件（`AUTH_ENABLED` 开关）
+- `app/store/audit_log.py` — 审计 JSONL
+- `scripts/generate_token.py` — 生成演示 Token
 - 现有 `conversation_store` 已预留 `tenant` 参数
 
 ## 7. 验收标准（规划）
 
-- [ ] `AUTH_ENABLED=true` 时无 token 返回 401
+- [x] `AUTH_ENABLED=true` 时无 token 返回 401
 - [ ] 租户 A 无法列出/检索租户 B 文档
-- [ ] 审计日志记录 upload/delete/settings 变更
-- [ ] `AUTH_ENABLED=false` 时行为与当前 Demo 一致
+- [x] 审计日志记录 upload/delete/settings 变更
+- [x] `AUTH_ENABLED=false` 时行为与当前 Demo 一致
 
 ## 8. 已知缺口
 
-- **全部未实现** — 本 PRD 为迭代契约，开发前须细化 API Breaking 变更说明
+- **租户数据隔离** — store/vector/ES 层 filter 未实现
 - 与 Java 版 `enterprise-kb` 权限模型对齐表待补充

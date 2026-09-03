@@ -133,3 +133,7 @@ def record_chat_metrics(
 
 def record_feedback(rating: str) -> None:
     METRICS.inc("rag_feedback_total", rating=rating)
+
+
+def record_citation_click(filename: str) -> None:
+    METRICS.inc("rag_citation_click_total", filename=filename)

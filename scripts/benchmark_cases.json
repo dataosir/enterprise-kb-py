@@ -3,6 +3,7 @@
     "question": "退款多久到账？",
     "expected_filename": "refund-policy.md",
     "expected_answer": "审核通过后 5~10 个工作日原路退回。",
+    "expected_chunk_substrings": ["5~10 个工作日", "原路退回"],
     "tags": ["semantic", "faq", "policy", "refund"],
     "difficulty": "easy"
   },
@@ -111,6 +112,7 @@
     "question": "Cisco AnyConnect 版本要求是多少？",
     "expected_filename": "it-faq.md",
     "expected_answer": "Cisco AnyConnect 4.10 及以上版本。",
+    "expected_chunk_substrings": ["4.10", "AnyConnect"],
     "tags": ["keyword", "it"],
     "difficulty": "medium"
   },
@@ -209,6 +211,7 @@
     "question": "信息安全事件 P0 级响应时间是多少？",
     "expected_filename": "security-policy.md",
     "expected_answer": "数据泄露/勒索事件 P0 响应时间 30 分钟。",
+    "expected_chunk_substrings": ["P0", "30 分钟"],
     "tags": ["keyword", "confusion", "security"],
     "difficulty": "hard"
   },
@@ -265,6 +268,7 @@
     "question": "IT 生产系统宕机 P0 响应时间是多少？",
     "expected_filename": "it-faq.md",
     "expected_answer": "P0 生产系统宕机响应时间 15 分钟。",
+    "expected_chunk_substrings": ["15 分钟", "P0"],
     "tags": ["keyword", "confusion", "it"],
     "difficulty": "hard"
   },

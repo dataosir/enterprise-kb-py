@@ -141,3 +141,10 @@ S3_ENDPOINT = _env("S3_ENDPOINT") or _mw.get("S3_ENDPOINT", "")
 S3_ACCESS_KEY = _env("S3_ACCESS_KEY") or MINIO_ROOT_USER
 S3_SECRET_KEY = _env("S3_SECRET_KEY") or MINIO_ROOT_PASSWORD
 S3_BUCKET = _env("S3_BUCKET", "enterprise-kb")
+
+# F14 认证与多租户（默认关闭，与 Demo 行为一致）
+AUTH_ENABLED = _env("AUTH_ENABLED", "false").lower() in {"1", "true", "yes"}
+JWT_SECRET = _env("JWT_SECRET", "changeme-jwt-secret")
+DEFAULT_TENANT = _env("DEFAULT_TENANT", "default")
+JWT_TTL_SECONDS = int(os.getenv("JWT_TTL_SECONDS", "86400"))
+AUDIT_DIR = DATA_DIR / "audit"

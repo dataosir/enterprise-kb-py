@@ -89,7 +89,9 @@ class CaseResult:
     top_filename: str
     top_score: float
     context_chars: int
+    chunk_recall_at_k: float | None = None
     retrieved_files: list[str] = field(default_factory=list)
+    retrieved_chunk_ids: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -110,6 +112,7 @@ class ConfigResult:
     p95_retrieval_ms: float
     avg_top_score: float
     avg_context_chars: float
+    avg_chunk_recall_at_k: float | None
     by_tag: dict[str, dict[str, float]]
     case_results: list[CaseResult]
     hybrid_fallback: bool = False
@@ -161,8 +164,12 @@ def load_sample_documents() -> list[Document]:
 
 
 def assign_chunk_ids(chunks: list[Document]) -> None:
+    """按文档内顺序分配稳定 chunk_id（filename#index），便于标注 expected_chunk_ids。"""
+    counters: dict[str, int] = defaultdict(int)
     for chunk in chunks:
-        chunk.metadata["chunk_id"] = str(uuid4())
+        filename = str(chunk.metadata.get("filename", "unknown"))
+        chunk.metadata["chunk_id"] = f"{filename}#{counters[filename]}"
+        counters[filename] += 1
 
 
 def build_vectorstore(
@@ -290,6 +297,29 @@ def percentile(values: list[float], pct: float) -> float:
     return ordered[index]
 
 
+def compute_chunk_recall_at_k(
+    hits: list[tuple[Document, float]],
+    case: dict[str, Any],
+) -> float | None:
+    """Chunk 级 Recall@K：expected_chunk_ids 或 expected_chunk_substrings 命中比例。"""
+    expected_ids = case.get("expected_chunk_ids") or []
+    if expected_ids:
+        retrieved_ids = [str(doc.metadata.get("chunk_id", "")) for doc, _ in hits]
+        matched = sum(1 for eid in expected_ids if eid in retrieved_ids)
+        return matched / len(expected_ids)
+
+    substrings = case.get("expected_chunk_substrings") or []
+    if substrings:
+        contents = [doc.page_content for doc, _ in hits]
+        matched = sum(
+            1
+            for sub in substrings
+            if any(sub in content for content in contents)
+        )
+        return matched / len(substrings)
+    return None
+
+
 def compute_by_tag(case_results: list[CaseResult]) -> dict[str, dict[str, float]]:
     tag_cases: dict[str, list[CaseResult]] = defaultdict(list)
     for case in case_results:
@@ -368,10 +398,12 @@ def evaluate_config(
         hybrid_fallback = hybrid_fallback or fell_back
 
         retrieved_files = [str(doc.metadata.get("filename", "unknown")) for doc, _ in hits]
+        retrieved_chunk_ids = [str(doc.metadata.get("chunk_id", "")) for doc, _ in hits]
         top_filename = retrieved_files[0] if retrieved_files else ""
         top_score = float(hits[0][1]) if hits else 0.0
         context_chars = sum(len(doc.page_content) for doc, _ in hits)
         reciprocal_rank, first_hit_rank = compute_reciprocal_rank(retrieved_files, expected)
+        chunk_recall = compute_chunk_recall_at_k(hits, case)
 
         case_results.append(
             CaseResult(
@@ -386,12 +418,16 @@ def evaluate_config(
                 top_filename=top_filename,
                 top_score=top_score,
                 context_chars=context_chars,
+                chunk_recall_at_k=chunk_recall,
                 retrieved_files=retrieved_files,
+                retrieved_chunk_ids=retrieved_chunk_ids,
             )
         )
 
     n = len(case_results) or 1
     retrieval_times = [c.retrieval_ms for c in case_results]
+    chunk_recalls = [c.chunk_recall_at_k for c in case_results if c.chunk_recall_at_k is not None]
+    avg_chunk_recall = sum(chunk_recalls) / len(chunk_recalls) if chunk_recalls else None
     return ConfigResult(
         retrieval_mode=retrieval_mode,
         chunk_size=chunk_size,
@@ -409,6 +445,7 @@ def evaluate_config(
         p95_retrieval_ms=percentile(retrieval_times, 0.95),
         avg_top_score=sum(c.top_score for c in case_results) / n,
         avg_context_chars=sum(c.context_chars for c in case_results) / n,
+        avg_chunk_recall_at_k=avg_chunk_recall,
         by_tag=compute_by_tag(case_results),
         case_results=case_results,
         hybrid_fallback=hybrid_fallback,
@@ -423,7 +460,7 @@ def print_summary(results: list[ConfigResult]) -> None:
     header = (
         f"{'mode':<7} {'chunk':>6} {'overlap':>7} {'top_k':>5} "
         f"{'chunks':>6} {'ingest_s':>8} {'hit@1':>6} {'hit@k':>6} {'mrr':>6} "
-        f"{'ret_ms':>7} {'avg_score':>9} {'ctx_chars':>9}"
+        f"{'cRec':>6} {'ret_ms':>7} {'avg_score':>9} {'ctx_chars':>9}"
     )
     print(header)
     print("-" * 100)
@@ -434,10 +471,12 @@ def print_summary(results: list[ConfigResult]) -> None:
         mode_label = r.retrieval_mode
         if r.hybrid_fallback:
             mode_label += "*"
+        crec = f"{r.avg_chunk_recall_at_k:.0%}" if r.avg_chunk_recall_at_k is not None else "  n/a"
         print(
             f"{mode_label:<7} {r.chunk_size:>6} {r.chunk_overlap:>7} {r.top_k:>5} "
             f"{r.total_chunks:>6} {r.ingest_seconds:>8.2f} "
             f"{r.hit_at_1_rate:>6.0%} {r.hit_at_k_rate:>6.0%} {r.mrr:>6.0%} "
+            f"{crec:>6} "
             f"{r.avg_retrieval_ms:>7.0f} "
             f"{r.avg_top_score:>9.4f} {r.avg_context_chars:>9.0f}"
         )
@@ -476,6 +515,7 @@ def write_csv(path: Path, results: list[ConfigResult]) -> None:
                 "p95_retrieval_ms",
                 "avg_top_score",
                 "avg_context_chars",
+                "avg_chunk_recall_at_k",
                 "hybrid_fallback",
             ]
         )
@@ -498,6 +538,7 @@ def write_csv(path: Path, results: list[ConfigResult]) -> None:
                     f"{r.p95_retrieval_ms:.1f}",
                     f"{r.avg_top_score:.4f}",
                     f"{r.avg_context_chars:.0f}",
+                    "" if r.avg_chunk_recall_at_k is None else f"{r.avg_chunk_recall_at_k:.4f}",
                     r.hybrid_fallback,
                 ]
             )
@@ -525,6 +566,7 @@ def write_json(path: Path, results: list[ConfigResult], cases: list[dict[str, An
                 "p95_retrieval_ms": r.p95_retrieval_ms,
                 "avg_top_score": r.avg_top_score,
                 "avg_context_chars": r.avg_context_chars,
+                "avg_chunk_recall_at_k": r.avg_chunk_recall_at_k,
                 "hybrid_fallback": r.hybrid_fallback,
                 "by_tag": r.by_tag,
                 "details": [
@@ -540,7 +582,9 @@ def write_json(path: Path, results: list[ConfigResult], cases: list[dict[str, An
                         "top_filename": c.top_filename,
                         "top_score": c.top_score,
                         "context_chars": c.context_chars,
+                        "chunk_recall_at_k": c.chunk_recall_at_k,
                         "retrieved_files": c.retrieved_files,
+                        "retrieved_chunk_ids": c.retrieved_chunk_ids,
                     }
                     for c in r.case_results
                 ],
@@ -549,6 +593,30 @@ def write_json(path: Path, results: list[ConfigResult], cases: list[dict[str, An
         ],
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def append_eval_history(results: list[ConfigResult], cases: list[dict[str, Any]]) -> None:
+    """追加 L2 摘要到 history.jsonl，供看板趋势图使用。"""
+    history_file = ROOT / "data" / "eval" / "history.jsonl"
+    history_file.parent.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "case_count": len(cases),
+        "results": [
+            {
+                "retrieval_mode": r.retrieval_mode,
+                "chunk_size": r.chunk_size,
+                "top_k": r.top_k,
+                "hit_at_1_rate": r.hit_at_1_rate,
+                "hit_at_k_rate": r.hit_at_k_rate,
+                "mrr": r.mrr,
+                "avg_chunk_recall_at_k": r.avg_chunk_recall_at_k,
+            }
+            for r in results
+        ],
+    }
+    with history_file.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 def main() -> int:
@@ -689,6 +757,7 @@ def main() -> int:
     if not args.no_csv:
         write_csv(work_dir / "benchmark_rag_params.csv", results)
         write_json(work_dir / "benchmark_rag_params.json", results, cases)
+        append_eval_history(results, cases)
         print(f"结果已写入: {work_dir / 'benchmark_rag_params.csv'}")
         print(f"详情已写入: {work_dir / 'benchmark_rag_params.json'}")
 

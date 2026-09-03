@@ -18,6 +18,7 @@ BASELINE_FILE = BASE_DIR / "data" / "eval" / "baseline.json"
 FEEDBACK_FILE = BASE_DIR / "data" / "eval" / "feedback.jsonl"
 BAD_CASES_FILE = BASE_DIR / "data" / "eval" / "bad_cases_candidates.json"
 BENCHMARK_CASES = BASE_DIR / "scripts" / "benchmark_cases.json"
+HISTORY_FILE = BASE_DIR / "data" / "eval" / "history.jsonl"
 
 
 def _load_json(path: Path) -> dict[str, Any] | None:
@@ -553,6 +554,13 @@ def build_eval_dashboard() -> dict[str, Any]:
 
     runtime = parse_prometheus_text(METRICS.render())
 
+    # by_tag：取 baseline 配置对应行的分场景统计
+    by_tag: dict[str, dict[str, float]] = {}
+    if l2_row:
+        by_tag = l2_row.get("by_tag", {})
+
+    history = _load_jsonl(HISTORY_FILE)[-20:]
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "baseline": baseline,
@@ -562,6 +570,8 @@ def build_eval_dashboard() -> dict[str, Any]:
         },
         "layers": layers,
         "benchmark_modes": benchmark_modes,
+        "by_tag": by_tag,
+        "eval_history": history,
         "benchmark_cases": {
             "total": case_count,
             "with_expected_answer": expected_answer_count,

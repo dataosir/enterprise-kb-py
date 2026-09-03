@@ -2,6 +2,8 @@ from app.models.domain import DocumentRecord, RetrievedChunk
 from app.models.schemas import (
     ChatRequest,
     ChatResponse,
+    CitationClickRequest,
+    CitationClickResponse,
     ConversationResponse,
     EsSyncResult,
     FeedbackRequest,
@@ -17,6 +19,8 @@ from app.models.schemas import (
 __all__ = [
     "ChatRequest",
     "ChatResponse",
+    "CitationClickRequest",
+    "CitationClickResponse",
     "ConversationResponse",
     "DocumentRecord",
     "EsSyncResult",

@@ -62,7 +62,8 @@ RAG 质量不能只看最终答案。需要 **L1→L4 分层评测**，每层有
 ### 3.5 Out
 
 - 自动写回推荐参数到 `rag_settings`
-- Recall@K / NDCG（需 chunk 级标注，后续迭代）
+- Chunk Recall@K（`expected_chunk_substrings` / `expected_chunk_ids`，benchmark 已支持）
+- NDCG（需多级相关性标注，后续迭代）
 - 外置 Grafana 配置（本项目提供内置 HTML 看板 + `/metrics` 端点）
 - 完整 RAGAS CI（L3 默认不进 smoke，避免 API Key 依赖）
 
@@ -272,8 +273,7 @@ vector 易错题：`Cisco AnyConnect 版本`、`P0 响应时间`、`付费产品
 
 ## 9. 已知缺口 / 待迭代
 
-- Recall@K / NDCG（chunk 级标注）
+- NDCG（chunk 级多级标注）
 - score_threshold 路径 benchmark
-- L3 纳入 CI（需 mock LLM 或专用评测环境）
-- Grafana Dashboard 模板
-- 引用点击采纳率（需前端埋点）
+- confusion 子集独立基线阈值
+- L3 定期 CI（`eval-ragas.yml` 需 Secret，手动触发）

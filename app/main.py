@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -16,6 +16,8 @@ from app.config import (
 from app.models import (
     ChatRequest,
     ChatResponse,
+    CitationClickRequest,
+    CitationClickResponse,
     ConversationResponse,
     EsSyncResult,
     FeedbackRequest,
@@ -31,10 +33,12 @@ from app.models.domain import DocumentRecord
 from app.services import bootstrap_sample_docs, get_rag_engine
 from app.services.eval_dashboard import build_eval_dashboard
 from app.services.middleware_map import build_middleware_map
-from app.observability.metrics import METRICS, record_feedback
+from app.observability.metrics import METRICS, record_citation_click, record_feedback
+from app.middleware.auth import AuthMiddleware
 from app.services.arq_pool import close_arq_pool, enqueue_ingest_job
 from app.store import get_document_store
 from app.store.feedback_store import append_feedback
+from app.store.audit_log import append_audit
 from app.store.object_storage import get_object_storage
 from app.store.object_storage.factory import s3_status
 from app.store.pg_client import pg_status
@@ -59,6 +63,17 @@ app = FastAPI(
     description="本地企业知识库 RAG Demo — FastAPI + LangChain + Chroma",
     lifespan=lifespan,
 )
+app.add_middleware(AuthMiddleware)
+
+
+def _audit_from_request(request: Request, action: str, resource: str, detail: dict | None = None) -> None:
+    append_audit(
+        action,
+        user_id=getattr(request.state, "user_id", "anonymous"),
+        tenant_id=getattr(request.state, "tenant_id", "default"),
+        resource=resource,
+        detail=detail,
+    )
 
 
 @app.get("/api/settings/rag")
@@ -67,13 +82,13 @@ def get_rag_settings() -> dict:
 
 
 @app.put("/api/settings/rag")
-def update_rag_settings(req: RagSettingsUpdate) -> dict:
+def update_rag_settings(req: RagSettingsUpdate, request: Request) -> dict:
     payload = req.model_dump(exclude_unset=True)
     if not payload:
         raise HTTPException(status_code=400, detail="至少提供一个参数")
 
     try:
-        return get_rag_engine().update_settings(
+        result = get_rag_engine().update_settings(
             top_k=req.top_k,
             chunk_size=req.chunk_size,
             chunk_overlap=req.chunk_overlap,
@@ -93,6 +108,8 @@ def update_rag_settings(req: RagSettingsUpdate) -> dict:
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    _audit_from_request(request, "settings.update", "rag", {"fields": list(payload.keys())})
+    return result
 
 
 @app.post("/api/settings/rag/reindex", response_model=ReindexResult)
@@ -180,15 +197,22 @@ def submit_feedback(req: FeedbackRequest) -> FeedbackResponse:
     return FeedbackResponse(id=record["id"], message="反馈已记录")
 
 
+@app.post("/api/metrics/citation", response_model=CitationClickResponse)
+def record_citation(req: CitationClickRequest) -> CitationClickResponse:
+    record_citation_click(req.filename)
+    return CitationClickResponse()
+
+
 @app.get("/api/documents")
 def list_documents() -> list[dict]:
     return [doc.to_api_dict() for doc in get_document_store().list_all()]
 
 
 @app.delete("/api/documents/{doc_id}")
-def delete_document(doc_id: str) -> dict[str, str]:
+def delete_document(doc_id: str, request: Request) -> dict[str, str]:
     if not get_rag_engine().delete_document(doc_id):
         raise HTTPException(status_code=404, detail="Document not found")
+    _audit_from_request(request, "document.delete", doc_id)
     return {"message": "文档已删除"}
 
 
@@ -254,7 +278,7 @@ def get_job_status(job_id: str) -> JobStatusResponse:
 
 
 @app.post("/api/documents/upload", response_model=IngestResult)
-async def upload_document(file: UploadFile = File(...)) -> IngestResult:
+async def upload_document(request: Request, file: UploadFile = File(...)) -> IngestResult:
     from datetime import datetime, timezone
 
     storage = get_object_storage()
@@ -303,6 +327,12 @@ async def upload_document(file: UploadFile = File(...)) -> IngestResult:
             get_document_store().delete(doc_id)
             raise HTTPException(status_code=500, detail=f"异步入库任务创建失败: {exc}") from exc
 
+        _audit_from_request(
+            request,
+            "document.upload.async",
+            doc_id,
+            {"filename": filename, "size": len(content)},
+        )
         return IngestResult(
             doc_id=doc_id,
             filename=filename,
@@ -320,6 +350,12 @@ async def upload_document(file: UploadFile = File(...)) -> IngestResult:
         storage.delete(storage_ref)
         raise HTTPException(status_code=500, detail=f"文档入库失败: {exc}") from exc
 
+    _audit_from_request(
+        request,
+        "document.upload",
+        doc_id,
+        {"filename": filename, "size": len(content), "chunk_count": chunk_count},
+    )
     return IngestResult(
         doc_id=doc_id,
         filename=filename,

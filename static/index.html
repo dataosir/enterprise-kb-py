@@ -123,6 +123,20 @@
             background: var(--bot-bg);
             border: 1px solid var(--border);
         }
+        .message.bot strong { color: #93c5fd; }
+        .message.bot code {
+            background: rgba(0,0,0,0.3);
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 13px;
+        }
+        .message.bot ul { margin: 8px 0 8px 20px; }
+        .message.streaming::after {
+            content: '▋';
+            animation: blink 1s step-end infinite;
+            color: var(--accent);
+        }
+        @keyframes blink { 50% { opacity: 0; } }
         .sources {
             margin-top: 8px;
             padding-top: 8px;
@@ -130,6 +144,13 @@
             font-size: 12px;
             color: var(--muted);
         }
+        .citation {
+            color: var(--accent);
+            cursor: pointer;
+            text-decoration: underline;
+            margin-right: 6px;
+        }
+        .citation:hover { color: #93c5fd; }
         .input-area {
             padding: 16px 24px;
             border-top: 1px solid var(--border);
@@ -785,10 +806,56 @@
         function addMessage(text, role) {
             const div = document.createElement('div');
             div.className = `message ${role}`;
-            div.textContent = text;
+            if (role === 'bot') {
+                div.innerHTML = renderMarkdown(text);
+            } else {
+                div.textContent = text;
+            }
             document.getElementById('messages').appendChild(div);
             div.scrollIntoView({ behavior: 'smooth' });
             return div;
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function renderMarkdown(text) {
+            if (!text) return '';
+            let html = escapeHtml(text);
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`);
+            html = html.replace(/\n/g, '<br>');
+            return html;
+        }
+
+        function appendSources(botMsg, sources, question) {
+            if (!sources?.length) return;
+            const box = document.createElement('div');
+            box.className = 'sources';
+            box.appendChild(document.createTextNode('引用: '));
+            sources.forEach((s, i) => {
+                if (i > 0) box.appendChild(document.createTextNode(', '));
+                const link = document.createElement('span');
+                link.className = 'citation';
+                link.textContent = s.filename;
+                link.title = s.snippet || '';
+                link.addEventListener('click', () => recordCitationClick(s.filename, question));
+                box.appendChild(link);
+            });
+            botMsg.appendChild(box);
+        }
+
+        async function recordCitationClick(filename, question) {
+            try {
+                await fetch('/api/metrics/citation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename, question, conversationId }),
+                });
+            } catch { /* ignore */ }
         }
 
         async function sendQuestion() {
@@ -802,22 +869,38 @@
             addMessage(question, 'user');
 
             const botMsg = addMessage('', 'bot');
+            botMsg.classList.add('streaming');
+            let answerText = '';
+            let sources = [];
 
             try {
-                const res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ question, conversationId })
+                const srcRes = await fetch(`/api/chat/sources?question=${encodeURIComponent(question)}`);
+                if (srcRes.ok) sources = await srcRes.json();
+            } catch { /* fallback without sources preview */ }
+
+            try {
+                const url = `/api/chat/stream?question=${encodeURIComponent(question)}&conversation_id=${encodeURIComponent(conversationId)}`;
+                await new Promise((resolve, reject) => {
+                    const es = new EventSource(url);
+                    es.onmessage = (e) => {
+                        if (e.data === '[DONE]') {
+                            es.close();
+                            resolve();
+                            return;
+                        }
+                        answerText += e.data;
+                        botMsg.innerHTML = renderMarkdown(answerText);
+                    };
+                    es.onerror = () => {
+                        es.close();
+                        if (!answerText) reject(new Error('stream failed'));
+                        else resolve();
+                    };
                 });
-                const data = await res.json();
-                botMsg.textContent = data.answer;
-                if (data.sources && data.sources.length > 0) {
-                    const sources = document.createElement('div');
-                    sources.className = 'sources';
-                    sources.textContent = '引用: ' + data.sources.map(s => s.filename).join(', ');
-                    botMsg.appendChild(sources);
-                }
+                botMsg.classList.remove('streaming');
+                appendSources(botMsg, sources, question);
             } catch (e) {
+                botMsg.classList.remove('streaming');
                 botMsg.textContent = '请求失败，请检查 API Key 配置和服务状态。';
             }
 

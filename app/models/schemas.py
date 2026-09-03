@@ -153,3 +153,15 @@ class FeedbackRequest(BaseModel):
 class FeedbackResponse(BaseModel):
     id: str
     message: str
+
+
+class CitationClickRequest(BaseModel):
+    filename: str
+    question: str | None = None
+    conversation_id: str | None = Field(default=None, alias="conversationId")
+
+    model_config = {"populate_by_name": True}
+
+
+class CitationClickResponse(BaseModel):
+    message: str = "引用点击已记录"

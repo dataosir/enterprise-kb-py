@@ -140,6 +140,17 @@ make benchmark -- --modes vector,hybrid,rerank,mmr,hybrid_rerank --chunk-sizes 5
 
 **实测（2026-09）**：vector hit@1=88% → hybrid/rerank hit@1=92%；MRR 0.92 → 0.96。
 
+### 4.6 Chunk Recall@K
+
+用例可选字段（`benchmark_cases.json`）：
+
+| 字段 | 说明 |
+|------|------|
+| `expected_chunk_substrings` | 关键片段文本，Top-K 中至少一块包含即算命中 |
+| `expected_chunk_ids` | 稳定 ID（`filename#index`），与 benchmark 切分一致时更精确 |
+
+benchmark 输出 `avg_chunk_recall_at_k` 与每题 `chunk_recall_at_k`；每次运行追加 `data/eval/history.jsonl` 供看板趋势。
+
 ---
 
 ## 5. 基线门禁

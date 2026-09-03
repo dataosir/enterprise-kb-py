@@ -38,7 +38,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m venv .venv
-          .venv/bin/pip install -r requirements.txt
+          .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run API smoke tests
+        run: make test
 
       - name: Run eval smoke (L1 + L2 + baseline)
         run: make eval-smoke

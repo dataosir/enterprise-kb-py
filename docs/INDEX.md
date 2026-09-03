@@ -31,6 +31,7 @@
 | [`tech/ARCHITECTURE.md`](tech/ARCHITECTURE.md) | 系统架构、数据流、目录结构、技术选型 |
 | [`tech/MIDDLEWARE.md`](tech/MIDDLEWARE.md) | **中间件专题**：AI vs 传统分类、职责、等价物、优缺点、Profile 选型 |
 | 中间件思维导图 | `http://127.0.0.1:8081/middleware-map.html` — SVG 交互图 + `/api/middleware/map` |
+| [`tech/BACKLOG.md`](tech/BACKLOG.md) | **缺口专题**：未实现项矩阵、Sprint 顺序、验收命令 |
 | [`tech/EVALUATION.md`](tech/EVALUATION.md) | L1–L4 评测专题：切分/benchmark/RAGAS/基线/可观测/反馈回流 |
 
 ---

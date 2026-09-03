@@ -225,6 +225,12 @@
         }
         .workflow-arrow { color: var(--accent); }
         .loading { text-align: center; padding: 80px; color: var(--muted); }
+        .tag-bar-row { margin-bottom: 10px; }
+        .tag-bar-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .tag-bar-track { height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+        .tag-bar-fill { height: 100%; background: var(--l2); border-radius: 4px; }
+        .history-list { font-size: 13px; color: var(--muted); }
+        .history-item { padding: 8px 0; border-bottom: 1px solid rgba(42,58,82,0.5); }
         @media (max-width: 768px) {
             main { padding: 16px; }
             #mindmap-svg { height: 480px; }
@@ -319,6 +325,42 @@
             </div>`;
         }
 
+        function renderByTagSection(byTag) {
+            if (!byTag || !Object.keys(byTag).length) {
+                return '<p style="color:var(--muted)">暂无 by_tag 数据，运行 make benchmark 后刷新</p>';
+            }
+            const priority = ['keyword', 'semantic', 'confusion', 'faq'];
+            const tags = Object.keys(byTag).sort((a, b) => {
+                const ia = priority.indexOf(a), ib = priority.indexOf(b);
+                if (ia >= 0 && ib >= 0) return ia - ib;
+                if (ia >= 0) return -1;
+                if (ib >= 0) return 1;
+                return a.localeCompare(b);
+            });
+            const bars = tags.map(tag => {
+                const s = byTag[tag];
+                const pct = (s.hit_at_1_rate || 0) * 100;
+                return `<div class="tag-bar-row">
+                    <div class="tag-bar-label"><span>${tag} (n=${s.count})</span><span>hit@1 ${pct.toFixed(0)}% · MRR ${(s.mrr||0).toFixed(2)}</span></div>
+                    <div class="tag-bar-track"><div class="tag-bar-fill" style="width:${pct}%"></div></div>
+                </div>`;
+            }).join('');
+            return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">${bars}</div>`;
+        }
+
+        function renderHistorySection(history) {
+            if (!history?.length) {
+                return '<p style="color:var(--muted)">暂无历史记录；每次 benchmark 会追加到 data/eval/history.jsonl</p>';
+            }
+            const items = [...history].reverse().slice(0, 8).map(entry => {
+                const best = (entry.results || []).find(r => r.retrieval_mode === 'vector' && r.chunk_size === 512) || entry.results?.[0];
+                if (!best) return '';
+                const crec = best.avg_chunk_recall_at_k != null ? ` · cRec ${(best.avg_chunk_recall_at_k*100).toFixed(0)}%` : '';
+                return `<div class="history-item">${entry.timestamp} · ${best.retrieval_mode} c${best.chunk_size} · hit@1 ${(best.hit_at_1_rate*100).toFixed(0)}% · MRR ${best.mrr.toFixed(2)}${crec}</div>`;
+            }).join('');
+            return `<div class="history-list">${items}</div>`;
+        }
+
         function renderBenchmarkTable(modes) {
             if (!modes?.length) return '<p style="color:var(--muted)">暂无 benchmark 结果，运行 make benchmark</p>';
             const rows = modes.map(m => `<tr>
@@ -349,6 +391,7 @@
                 { label: '生成耗时均值', value: hist.rag_generation_seconds ? fmtMs(hist.rag_generation_seconds.avg * 1000) : '—' },
                 { label: '好评 👍', value: Math.round(rt.feedback_up || 0) },
                 { label: '差评 👎', value: Math.round(rt.feedback_down || 0) },
+                { label: '引用点击', value: Math.round(counters.rag_citation_click_total || 0) },
             ];
             return `<div class="runtime-grid">${cards.map(c => `
                 <div class="runtime-card">
@@ -583,6 +626,14 @@
                 <div class="section">
                     <h2>L2 检索模式对比</h2>
                     ${renderBenchmarkTable(data.benchmark_modes)}
+                </div>
+                <div class="section">
+                    <h2>分场景 by_tag（baseline 配置）</h2>
+                    ${renderByTagSection(data.by_tag)}
+                </div>
+                <div class="section">
+                    <h2>评测历史趋势</h2>
+                    ${renderHistorySection(data.eval_history)}
                 </div>
                 <div class="section">
                     <h2>运行时观测 · 生产参考</h2>
