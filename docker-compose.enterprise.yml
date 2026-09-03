@@ -47,7 +47,7 @@ services:
     environment:
       discovery.type: single-node
       xpack.security.enabled: "false"
-      # 飞牛 NAS 内存有限，默认 256MB 堆；内存充足可改为 -Xms512m -Xmx512m
+      # 低内存设备建议 256MB 堆；内存充足可改为 -Xms512m -Xmx512m
       ES_JAVA_OPTS: "${ES_JAVA_OPTS}"
       bootstrap.memory_lock: "false"
     volumes:

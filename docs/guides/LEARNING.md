@@ -4,8 +4,9 @@
 
 相关文档：
 
-- [README.md](README.md) — 快速开始与配置
-- [ARCHITECTURE.md](ARCHITECTURE.md) — 分层架构与设计决策
+- [README.md](../../README.md) — 快速开始与配置
+- [ARCHITECTURE.md](../tech/ARCHITECTURE.md) — 分层架构与设计决策
+- [文档中心](../README.md) — 全部分层文档入口
 
 ---
 

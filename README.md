@@ -2,7 +2,7 @@
 
 > 本地可运行的 RAG Demo — FastAPI + LangChain + Chroma  
 > Java 版见 `../enterprise-kb/`，两个项目 API 对齐，方便对照学习。  
-> 架构说明见 [ARCHITECTURE.md](ARCHITECTURE.md)，学习指南见 [LEARNING.md](LEARNING.md)，企业级演进方案见 [docs/ENTERPRISE_PLAN.md](docs/ENTERPRISE_PLAN.md)，中间件安装见 [docs/MIDDLEWARE_SETUP.md](docs/MIDDLEWARE_SETUP.md)
+> 文档中心见 [docs/README.md](docs/README.md) · 架构 [docs/tech/ARCHITECTURE.md](docs/tech/ARCHITECTURE.md) · 学习 [docs/guides/LEARNING.md](docs/guides/LEARNING.md) · 企业方案 [docs/enterprise/ENTERPRISE_PLAN.md](docs/enterprise/ENTERPRISE_PLAN.md)
 
 ## 功能
 
@@ -81,6 +81,19 @@ curl http://localhost:8081/api/documents
 ```
 
 浏览器打开 http://localhost:8081 可使用 Web UI。
+
+## 文档
+
+完整文档在 [`docs/`](docs/README.md) 目录，按层组织：
+
+| 层 | 入口 | 适合 |
+|---|---|---|
+| 产品 | [prd/](docs/prd/README.md) | 功能需求、验收标准、F01–F14 迭代 |
+| 学习 | [guides/LEARNING.md](docs/guides/LEARNING.md) | 理解 RAG 流程与核心代码 |
+| 技术 | [tech/ARCHITECTURE.md](docs/tech/ARCHITECTURE.md) | 架构、数据流、技术选型 |
+| 企业 | [enterprise/](docs/enterprise/README.md) | 演进方案、中间件部署、RAG 评测 |
+
+文件清单见 [docs/INDEX.md](docs/INDEX.md)。
 
 ## 配置说明
 
@@ -179,7 +192,7 @@ make dev      # 重启后会重新加载 sample-docs
 
 ## 学习路线
 
-详细流程与核心代码解读见 [LEARNING.md](LEARNING.md)。
+详细流程与核心代码解读见 [docs/guides/LEARNING.md](docs/guides/LEARNING.md)。
 
 **调参对比（自动评测 chunk / topK）：**
 
@@ -188,6 +201,8 @@ make benchmark
 # 或 ./scripts/benchmark.sh --verbose
 # 结果 → data/benchmark/benchmark_rag_params.csv
 ```
+
+切分规则、Hit@K / RAGAS 等指标定义与评测落地规划见 **[docs/enterprise/RAG_EVALUATION.md](docs/enterprise/RAG_EVALUATION.md)**（面试重点）。
 
 ```
 Week 1                              Week 2

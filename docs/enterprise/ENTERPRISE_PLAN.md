@@ -431,6 +431,8 @@ CREATE TABLE audit_logs (
 | `faithfulness` | 回答是否忠于上下文（防幻觉） |
 | `answer_relevancy` | 回答是否切题 |
 
+**详细指标定义、切分量化方法、面试问答** 见 **[RAG_EVALUATION.md](./RAG_EVALUATION.md)**。
+
 **流程**：
 
 ```
@@ -603,10 +605,16 @@ app/
 docker-compose.yml              # Demo（当前）
 docker-compose.enterprise.yml   # 企业全栈
 docs/
-├── ENTERPRISE_PLAN.md          # 本文档
-├── MIDDLEWARE_SETUP.md         # 中间件安装与运维（飞牛 NAS 已部署）
-├── ARCHITECTURE.md
-└── LEARNING.md
+├── README.md                   # 文档中心入口
+├── INDEX.md                    # 权威文件清单
+├── guides/
+│   └── LEARNING.md             # RAG 学习指南
+├── tech/
+│   └── ARCHITECTURE.md         # 架构说明
+└── enterprise/
+    ├── ENTERPRISE_PLAN.md      # 本文档
+    ├── MIDDLEWARE_SETUP.md     # 中间件部署
+    └── RAG_EVALUATION.md       # RAG 评测
 ```
 
 ---

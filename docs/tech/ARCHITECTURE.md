@@ -121,7 +121,7 @@ static/                  # Web UI
 3. **Phase 3** — 基础设施：Redis 会话、异步入库、pgvector / MinIO
 4. **Phase 4** — 安全与运维：JWT 鉴权、多租户、RAGAS 评估、Prometheus
 
-详细技术方案见 [docs/ENTERPRISE_PLAN.md](docs/ENTERPRISE_PLAN.md)；飞牛 NAS 中间件安装记录见 [docs/MIDDLEWARE_SETUP.md](docs/MIDDLEWARE_SETUP.md)。
+详细技术方案见 [ENTERPRISE_PLAN.md](../enterprise/ENTERPRISE_PLAN.md)；中间件部署见 [MIDDLEWARE_SETUP.md](../enterprise/MIDDLEWARE_SETUP.md)。
 
 ## 本地开发
 

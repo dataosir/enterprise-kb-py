@@ -1,7 +1,8 @@
 # 企业级中间件安装指南
 
-> 本文说明如何部署企业知识库配套的中间件栈，适用于 **飞牛 NAS**、Linux 服务器或任何支持 Docker 的环境。  
-> 技术方案背景见 [ENTERPRISE_PLAN.md](./ENTERPRISE_PLAN.md)。
+> 本文说明如何部署企业知识库配套的中间件栈，适用于飞牛 NAS、Linux 服务器或任何支持 Docker 的环境。  
+> 技术方案背景见 [ENTERPRISE_PLAN.md](./ENTERPRISE_PLAN.md)。  
+> **安全提示：** 本文不包含真实账号密码；凭据仅在本地 `.env` 中配置，勿提交 Git。
 
 ---
 
@@ -10,7 +11,7 @@
 | 服务 | 容器名 | 默认端口 | 用途 |
 |------|--------|----------|------|
 | Redis 7 | `kb-redis` | **6379** | 会话持久化、限流、任务队列 |
-| PostgreSQL 16 + pgvector | `kb-postgres` | **5433**（映射到容器 5432） | 生产向量库、元数据（用户 `kb`，密码见 `.env` 中 `POSTGRES_PASSWORD`） |
+| PostgreSQL 16 + pgvector | `kb-postgres` | **5433**（映射到容器 5432） | 生产向量库、元数据 |
 | Elasticsearch 8.15 | `kb-elasticsearch` | **9200** | BM25 混合检索 |
 | MinIO | `kb-minio` | **9000**（API）/ **9001**（控制台） | 对象存储 |
 | IK 中文分词 | — | — | ES 中文分词插件（需手动安装） |
@@ -21,7 +22,7 @@
 
 ## 2. 资源建议（低内存 NAS）
 
-飞牛等 **6GB 内存** 设备建议：
+6GB 内存设备建议：
 
 | 服务 | 内存策略 |
 |------|----------|
@@ -42,20 +43,31 @@
 - 端口未被占用：`6379`、`5433`、`9200`、`9000`、`9001`
 - 有 sudo 权限（部分 NAS 需 `sudo docker`）
 
-### 3.2 启动
+### 3.2 配置凭据（首次必做）
 
 ```bash
-# 在项目根目录（确保已有 .env，密码见 .env.example 企业中间件段）
-cp .env.example .env   # 首次
+cp .env.example .env
+```
 
+在 `.env` 中：
+
+1. 取消 `MIDDLEWARE_HOST` 注释，填写 NAS / 服务器 IP 或 `127.0.0.1`
+2. **修改默认占位密码**（`POSTGRES_PASSWORD`、`MINIO_ROOT_PASSWORD` 等）— 模板中的 `changeme_*` 仅供本地开发，生产必须更换
+3. 其余连接串由应用根据 `MIDDLEWARE_HOST` 自动拼接，详见 `.env.example` 注释
+
+> 账号名、变量名与默认值以 [`.env.example`](../../.env.example) 为准；**不要在文档或代码中写入真实密码**。
+
+### 3.3 启动
+
+```bash
 docker compose -f docker-compose.enterprise.yml pull
 docker compose -f docker-compose.enterprise.yml up -d
 docker compose -f docker-compose.enterprise.yml ps
 ```
 
-Compose 会自动读取根目录 `.env` 中的 `POSTGRES_PASSWORD`、`MINIO_ROOT_PASSWORD` 等变量，与应用共用同一套账号。
+Compose 会读取根目录 `.env` 中的变量，与应用共用同一套账号配置。
 
-### 3.3 安装 Elasticsearch IK 中文分词（混合检索必做）
+### 3.4 安装 Elasticsearch IK 中文分词（混合检索必做）
 
 ```bash
 docker exec kb-elasticsearch bin/elasticsearch-plugin install -b \
@@ -76,7 +88,7 @@ docker exec kb-elasticsearch bin/elasticsearch-plugin list
 
 ## 4. 验证清单
 
-将 `YOUR_HOST` 替换为你的 NAS / 服务器内网 IP 或 `127.0.0.1`（与 `.env` 中 `MIDDLEWARE_HOST` 一致）：
+将 `YOUR_HOST` 替换为 `.env` 中 `MIDDLEWARE_HOST` 的值：
 
 ```bash
 # Redis
@@ -99,33 +111,31 @@ curl -X POST "http://YOUR_HOST:9200/_analyze" \
 curl http://YOUR_HOST:9000/minio/health/live
 ```
 
-MinIO 控制台：`http://YOUR_HOST:9001`（用户与密码见 `.env` 中 `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`）
+MinIO 控制台：`http://YOUR_HOST:9001`（登录凭据见本地 `.env` 中的 `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`）。
 
 ---
 
-## 5. 应用侧配置
+## 5. 应用侧对接
 
-在 `.env` 中取消 `MIDDLEWARE_HOST` 注释并填写地址（本机 `127.0.0.1` 或 NAS 内网 IP）：
+在 `.env` 中配置 `MIDDLEWARE_HOST` 后，应用会自动拼接 `REDIS_URL`、`DATABASE_URL`、`ES_URL`、`S3_*` 等。
+
+按需启用企业能力：
 
 ```bash
-# .env（账号密码与 compose 共用，见 .env.example 企业中间件段）
-MIDDLEWARE_HOST=127.0.0.1
+# Phase 2b 混合检索
+RAG_RETRIEVAL_MODE=hybrid
 
-# PostgreSQL：用户名 kb，默认密码 changeme_pg_password
-POSTGRES_USER=kb
-POSTGRES_PASSWORD=changeme_pg_password
-POSTGRES_DB=enterprise_kb
-POSTGRES_HOST_PORT=5433
+# Phase 3 Redis 会话 + 异步入库
+CONVERSATION_STORE=auto
+ASYNC_INGEST=auto
 
-MINIO_ROOT_USER=kbadmin
-MINIO_ROOT_PASSWORD=changeme_minio_password
+# Phase 4 生产向量库 + 对象存储
+VECTOR_STORE=pgvector
+STORAGE_BACKEND=s3
 ```
 
-应用会根据 `MIDDLEWARE_HOST` 自动拼接 `REDIS_URL`、`DATABASE_URL`、`ES_URL`、`S3_*` 等连接串。如需单独覆盖某项，可直接写对应的 `REDIS_URL` 等变量。
-
-MinIO 控制台：`http://<MIDDLEWARE_HOST>:9001`（用户 `MINIO_ROOT_USER`，密码 `MINIO_ROOT_PASSWORD`）
-
-> 当前 Demo 应用仍默认使用 Chroma + SQLite；上述变量供 **Phase 2b–4** 开发对接时使用。
+完整变量说明见 [`.env.example`](../../.env.example)。  
+切换向量库后，在页面侧栏点击 **「重建索引」** 完成数据迁移。
 
 ---
 
@@ -149,6 +159,16 @@ docker compose -f docker-compose.enterprise.yml up -d
 docker compose -f docker-compose.enterprise.yml down -v
 ```
 
+### 重置 PostgreSQL 密码
+
+若修改了 `.env` 中的 `POSTGRES_PASSWORD` 但容器内密码未同步：
+
+```bash
+./scripts/reset-pg-password.sh
+```
+
+脚本从本地 `.env` 读取新密码，不会把密码写入仓库。
+
 ---
 
 ## 7. 常见问题
@@ -165,7 +185,7 @@ docker compose -f docker-compose.enterprise.yml down -v
 
 ### 从外网访问？
 
-默认应仅内网可达。外网需 VPN 或反向代理，并**务必**配置认证。
+默认应仅内网可达。外网需 VPN 或反向代理，并**务必**配置认证与强密码。
 
 ---
 
@@ -178,16 +198,4 @@ docker compose -f docker-compose.enterprise.yml down -v
 | Phase 2a | 调参面板 + Rerank + 阈值过滤 | 无 |
 | Phase 2b | ES 混合检索 | Elasticsearch + IK |
 | Phase 3 | Redis 会话 + 异步入库 | Redis |
-| Phase 4 | pgvector 向量库 + MinIO 文件 ✅ | PostgreSQL + MinIO |
-
-### 启用 Phase 4（pgvector + MinIO）
-
-在 `.env` 中追加（或通过 `MIDDLEWARE_HOST` 自动拼接，见 `.env.example`）：
-
-```bash
-VECTOR_STORE=pgvector
-STORAGE_BACKEND=s3
-# DATABASE_URL / S3_* 由 MIDDLEWARE_HOST + 密码自动拼接，或手动指定
-```
-
-首次切换向量库后，在页面侧栏点击 **「重建索引」**，将 Chroma 中的片段迁移到 PostgreSQL。
+| Phase 4 | pgvector 向量库 + MinIO 文件 | PostgreSQL + MinIO |
