@@ -140,7 +140,7 @@ app/
 ├── store/               # SQLite 文档元数据
 └── services/            # RAG 引擎 + 启动引导
 data/                    # 运行时数据（向量库、上传文件、元数据）
-sample-docs/             # 内置示例（退款政策、远程办公、IT FAQ）
+sample-docs/             # 内置示例（6 篇：3 基础政策 + 3 hard 混淆集）
 static/                  # Web UI
 ```
 

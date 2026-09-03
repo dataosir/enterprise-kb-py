@@ -45,7 +45,7 @@
 
 ## 7. 验收标准
 
-- [ ] `curl /api/documents` 返回 JSON 数组含 3 篇示例（首次启动后）
+- [ ] `curl /api/documents` 返回 JSON 数组含 6 篇示例（首次启动后）
 - [ ] `DELETE` 后列表减少，再问相关问题无该文档来源
 - [ ] `GET /api/health` 的 `documents` 与列表长度一致
 

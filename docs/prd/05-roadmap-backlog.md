@@ -15,7 +15,10 @@
 | 3 | Redis 会话 + 异步入库 | F06–F07 | ✅ 完成 |
 | 4 | pgvector + MinIO | F08–F09 | ✅ 完成 |
 | 5 | 认证鉴权 + 多租户 | F14 | 📋 未开始 |
-| 6 | 可观测 + RAGAS | F12 扩展, F13 扩展 | 📋 未开始 |
+| 6 | 可观测 + RAGAS | F12 扩展, F13 扩展 | 🟡 部分完成 |
+
+**Phase 6 已交付**：`GET /metrics`、评测看板（`eval-dashboard.html`）、中间件导图、`make eval-smoke` + `.github/workflows/eval.yml`、L3 `eval_ragas.py` 脚手架、用户反馈回流。  
+**Phase 6 待补**：structlog / OpenTelemetry、RAGAS 进 CI、外置 Grafana 模板、`POST /api/eval/run`。
 
 ---
 
@@ -25,10 +28,10 @@
 |---|---|---|---|
 | P0 | SSE 流式接入 Web UI | F10 | API 已有，前端打字机 |
 | P1 | F14 认证与多租户 | F14 | JWT + tenant 隔离 |
-| P1 | Prometheus `/metrics` | F13 | Phase 6 监控 |
-| P2 | RAGAS 在线评估任务 | F12 | faithfulness 闭环 |
+| P1 | Hard benchmark 扩充 | F12 | ✅ 40 条用例 + 6 篇 sample-docs（含混淆集） |
+| P2 | RAGAS 纳入 CI | F12 | 脚手架已有，需 Secret 或 mock |
 | P2 | Query 改写 / HyDE | F03, F05 | 提升召回 |
-| P2 | GitHub Actions CI | F11, F12 | benchmark 冒烟 |
+| P2 | 外置 Grafana 模板 | F13 | `/metrics` 与内置看板已有 |
 | P3 | 智能切分（按标题） | F01 | 企业文档结构感知 |
 | P3 | Windows `package.bat` | F11 | 打包对称 |
 | P3 | Embedding 模型 UI 切换 | F04, F08 | 换模型需重建提示 |
@@ -41,7 +44,7 @@
 |---|---|---|
 | Sprint A | F10 | 前端 SSE + Markdown 回答渲染 |
 | Sprint B | F14 | 认证中间件 + tenant 过滤 |
-| Sprint C | F12, F13 | RAGAS 脚本 + Prometheus |
+| Sprint C | F12, F13 | RAGAS CI job + Grafana 模板 |
 | Sprint D | F05, F03 | Query 改写 + 检索对比 UI |
 
 ---

@@ -7,27 +7,38 @@
 
 ## 1. 现状与差距
 
-### 1.1 已有能力（Phase 1 ✅）
+### 1.1 已交付能力（Phase 1–4 ✅ + Phase 6 部分）
 
-| 能力 | 实现 |
-|------|------|
-| 文档入库 | PDF / Word / MD / TXT → 切分 → BGE Embedding → Chroma |
-| 向量检索 | `similarity_search_with_score`，Top-K 可调 |
-| RAG 问答 | DeepSeek / Ollama，SSE 流式 |
-| 文档管理 | SQLite 元数据，列表 / 删除 / 健康检查 |
-| 运行时调参 | 页面可调 Top-K / Chunk Size / Overlap，支持重建索引 |
-| 评测脚本 | `scripts/benchmark_rag_params.py` 离线对比 chunk/topK |
+| 能力 | Demo 默认 | Enterprise Profile |
+|------|-----------|------------------|
+| 文档入库 | PDF/Word/MD/TXT → 切分 → BGE → Chroma | + pgvector、ES 双写、MinIO/S3、ARQ 异步 |
+| 检索 | 向量 Top-K + fetch_k + threshold | + hybrid BM25 RRF、MMR、BGE Rerank |
+| RAG 问答 | DeepSeek / Ollama，SSE 流式 API | 同左 |
+| 文档管理 | SQLite 元数据 | 同左 |
+| 运行时调参 | 侧栏 + `PUT /api/settings/rag` | 同左 |
+| 会话 | 内存 | Redis（`CONVERSATION_STORE=redis`） |
+| 评测闭环 | L1–L4 脚本、baseline CI、`/metrics`、评测看板 | 同左 |
 
-### 1.2 企业级常见缺口
+### 1.2 当前缺口（按 Profile）
+
+**Demo Profile 仍缺（相对企业部署）**
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  检索层    纯向量 · 无阈值过滤 · 无混合检索 · 无 Rerank          │
-│  生成层    固定 Prompt / Temperature · 无上下文预算控制          │
-│  数据层    嵌入式 Chroma · 单机 SQLite · 本地文件存储            │
+│  数据层    嵌入式 Chroma · 本地 uploads · 无 ES hybrid           │
 │  会话层    进程内存 · 重启丢失 · 无多实例共享                      │
 │  安全层    无认证鉴权 · 无租户隔离 · 无审计日志                    │
-│  运维层    无异步任务 · 无监控指标 · 无质量评估闭环                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**全 Profile 仍缺**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  安全层    JWT / 多租户（F14 未实现）                             │
+│  运维层    structlog / OpenTelemetry · 外置 Grafana 模板         │
+│  评测层    L3 RAGAS 未进 CI · chunk 级 Recall@K / NDCG           │
+│  前端层    Web UI 未接 SSE 流式 / Markdown 渲染                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -734,10 +745,10 @@ PROMETHEUS_ENABLED=false
 |------|---------------------|---------|
 | 向量库 | Chroma → pgvector | PGVector |
 | 会话 | 内存 → Redis | Redis |
-| 混合检索 | ES + 向量 | 规划中 |
+| 混合检索 | ES + 向量 RRF ✅ | 规划中 |
 | 调参面板 | 页面动态 | 配置中心 |
 | 部署 | Docker Compose | K8s / Compose |
 
 ---
 
-*文档版本：v1.0 · 与 main 分支 Phase 1 架构对齐*
+*文档版本：v1.1 · 与 main 分支 Phase 1–4 已交付、Phase 5–6 进行中*

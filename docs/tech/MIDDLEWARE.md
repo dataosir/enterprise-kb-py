@@ -220,7 +220,7 @@ flowchart TB
 | **PostgreSQL FTS** | 不增组件 | 中文分词弱于 IK |
 | **仅向量、不用 BM25** | 架构最简单 | 关键词类问题 Hit@1 波动 |
 
-**实测参考**（本项目 23 题 sample-docs）：vector ~13ms，hybrid ~55ms，偶发 keyword 类 Top1 排序差异；复杂语料上 hybrid 收益更明显。
+**实测参考**（40 题 / 6 篇，chunk=512, top_k=4）：vector hit@1 **88%** / MRR 0.92；hybrid hit@1 **92%** / MRR 0.96（`confusion` 标签上 hybrid 优于 vector）；rerank hit@1 92% 但延迟 ~2s。
 
 ---
 

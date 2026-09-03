@@ -39,7 +39,7 @@
 | 指标 | 说明 | 当前参照 |
 |---|---|---|
 | Demo 启动成功率 | 无中间件 `make dev` 可问答 | ✅ |
-| 示例文档 Hit@K | benchmark 5 题全命中 | ✅ sample-docs |
+| 示例文档 Hit@K | benchmark 40 题（含 hard 混淆集） | ✅ sample-docs 6 篇 |
 | 混合检索可用 | ES 配置后 hybrid 模式可预览 | ✅ Phase 2b |
 | 会话重启不丢 | Redis 配置后会话持久化 | ✅ Phase 3 |
 | 企业 Demo 验收 | 见 F05 / F12 / enterprise 方案 | 部分达成 |

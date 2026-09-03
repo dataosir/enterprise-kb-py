@@ -68,7 +68,7 @@ async def lifespan(_: FastAPI):
 启动流程：
 
 1. 创建 `RagEngine`（加载 BGE 模型、连接 Chroma、初始化 LLM）
-2. `bootstrap_sample_docs`：若 SQLite 为空，自动加载 `sample-docs/` 下 3 篇示例文档
+2. `bootstrap_sample_docs`：若 SQLite 为空，自动加载 `sample-docs/` 下 **6 篇**示例文档（3 基础 + 3 hard 混淆集）
 
 ```12:16:app/services/bootstrap.py
 def bootstrap_sample_docs(engine: RagEngine) -> int:

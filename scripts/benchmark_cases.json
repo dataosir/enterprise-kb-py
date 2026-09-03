@@ -155,5 +155,124 @@
     "expected_answer": "试用期账号 90 天自动锁定。",
     "tags": ["keyword", "it"],
     "difficulty": "medium"
+  },
+  {
+    "question": "差旅费报销款财务审核通过后多久到账？",
+    "expected_filename": "benefits-policy.md",
+    "expected_answer": "财务审核通过后 7~15 个工作日打入工资卡。",
+    "tags": ["semantic", "confusion", "benefits"],
+    "difficulty": "hard"
+  },
+  {
+    "question": "出差结束后几天内必须提交差旅报销？",
+    "expected_filename": "benefits-policy.md",
+    "expected_answer": "出差结束后 7 个自然日内提交。",
+    "tags": ["keyword", "benefits"],
+    "difficulty": "hard"
+  },
+  {
+    "question": "公司资助培训未满 30 天离职需退还多少培训费？",
+    "expected_filename": "benefits-policy.md",
+    "expected_answer": "未满 30 天需退还 80% 培训费。",
+    "tags": ["semantic", "confusion", "benefits"],
+    "difficulty": "hard"
+  },
+  {
+    "question": "员工福利咨询热线是多少？",
+    "expected_filename": "benefits-policy.md",
+    "expected_answer": "400-888-0022（工作日 9:00-18:00）。",
+    "tags": ["keyword", "confusion", "benefits"],
+    "difficulty": "hard"
+  },
+  {
+    "question": "年度体检预约截止日是哪天？",
+    "expected_filename": "benefits-policy.md",
+    "expected_answer": "每年 11 月 30 日前完成预约。",
+    "tags": ["keyword", "benefits"],
+    "difficulty": "medium"
+  },
+  {
+    "question": "付费产品订阅退款到账需要几个工作日？",
+    "expected_filename": "refund-policy.md",
+    "expected_answer": "审核通过后 5~10 个工作日原路退回。",
+    "tags": ["semantic", "confusion", "refund"],
+    "difficulty": "hard"
+  },
+  {
+    "question": "外包人员 VPN 使用什么客户端？",
+    "expected_filename": "security-policy.md",
+    "expected_answer": "OpenVPN 2.5 客户端。",
+    "tags": ["keyword", "confusion", "security"],
+    "difficulty": "hard"
+  },
+  {
+    "question": "信息安全事件 P0 级响应时间是多少？",
+    "expected_filename": "security-policy.md",
+    "expected_answer": "数据泄露/勒索事件 P0 响应时间 30 分钟。",
+    "tags": ["keyword", "confusion", "security"],
+    "difficulty": "hard"
+  },
+  {
+    "question": "安全合规账号密码重置入口 URL 是什么？",
+    "expected_filename": "security-policy.md",
+    "expected_answer": "https://security.company.com/sso-reset",
+    "tags": ["keyword", "security"],
+    "difficulty": "hard"
+  },
+  {
+    "question": "终端安全软件自动全盘扫描时间？",
+    "expected_filename": "security-policy.md",
+    "expected_answer": "每周一 02:00 自动全盘扫描。",
+    "tags": ["keyword", "security"],
+    "difficulty": "medium"
+  },
+  {
+    "question": "L3 机密数据能否在公共 Wi-Fi 下访问？",
+    "expected_filename": "security-policy.md",
+    "expected_answer": "禁止在公共 Wi-Fi 下访问 L3 机密数据。",
+    "tags": ["semantic", "security"],
+    "difficulty": "hard"
+  },
+  {
+    "question": "内网 Git 代码提交是否必须 GPG 签名？",
+    "expected_filename": "security-policy.md",
+    "expected_answer": "所有代码提交须 GPG 签名，未签名提交将被拒绝。",
+    "tags": ["semantic", "security"],
+    "difficulty": "medium"
+  },
+  {
+    "question": "采购合同编号格式是什么？",
+    "expected_filename": "procurement-policy.md",
+    "expected_answer": "CG-YYYY-NNNN，例如 CG-2025-0042。",
+    "tags": ["keyword", "procurement"],
+    "difficulty": "hard"
+  },
+  {
+    "question": "供应商发票标准付款账期多少天？",
+    "expected_filename": "procurement-policy.md",
+    "expected_answer": "发票验收合格后 30 个自然日付款。",
+    "tags": ["keyword", "procurement"],
+    "difficulty": "medium"
+  },
+  {
+    "question": "金额超过 50 万的采购合同需要谁审批？",
+    "expected_filename": "procurement-policy.md",
+    "expected_answer": "VP 审批。",
+    "tags": ["semantic", "procurement"],
+    "difficulty": "hard"
+  },
+  {
+    "question": "IT 生产系统宕机 P0 响应时间是多少？",
+    "expected_filename": "it-faq.md",
+    "expected_answer": "P0 生产系统宕机响应时间 15 分钟。",
+    "tags": ["keyword", "confusion", "it"],
+    "difficulty": "hard"
+  },
+  {
+    "question": "正式员工 VPN 客户端版本要求是多少？",
+    "expected_filename": "it-faq.md",
+    "expected_answer": "Cisco AnyConnect 4.10 及以上版本。",
+    "tags": ["keyword", "confusion", "it"],
+    "difficulty": "hard"
   }
 ]

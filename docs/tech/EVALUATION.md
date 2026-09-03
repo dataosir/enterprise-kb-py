@@ -23,7 +23,7 @@ L4 业务指标  →  POST /api/feedback  +  scripts/export_bad_cases.py
 | L1 空块率/边界 | `make analyze-chunks` | CI 门禁 | ✅ |
 | L2 Hit@K + MRR | `make benchmark` | baseline.json | ✅ |
 | L2 全路径检索 | `--modes vector,hybrid,rerank,...` | 对齐 `retrieve_sources()` | ✅ |
-| 20+ 用例 + tags | `benchmark_cases.json` | PR 回归 | ✅ |
+| 20+ 用例 + tags | `benchmark_cases.json`（**40 条** / 6 篇文档） | PR 回归 | ✅ |
 | L3 RAGAS | `eval_ragas.py --run --ragas` | 可选 L3 基线 | 脚手架 |
 | 延迟埋点 | benchmark `retrieval_ms` | `/metrics` P50/P95 | ✅ |
 | 成本埋点 | — | `rag_tokens_estimated` | ✅ 估算 |
@@ -116,6 +116,30 @@ make benchmark -- --modes vector,hybrid,rerank,mmr,hybrid_rerank --chunk-sizes 5
 ./scripts/eval_smoke.sh
 ```
 
+### 4.5 Hard 混淆集（40 题 / 6 篇文档）
+
+`sample-docs/` 除 3 篇基础政策外，新增 3 篇 **故意混淆** 文档：
+
+| 文档 | 与谁混淆 | 典型考点 |
+|------|----------|----------|
+| `benefits-policy.md` | `refund-policy.md` | 「到账工作日」：产品 5~10 vs 差旅 7~15 |
+| `security-policy.md` | `it-faq.md` | P0 响应 30min vs 15min；OpenVPN vs AnyConnect |
+| `procurement-policy.md` | `it-faq.md` | ECS 采购通道 vs IT 自助申请 |
+
+用例标签 `confusion`（≥10 条）专用于对比 vector / hybrid / rerank。推荐命令：
+
+```bash
+./.venv/bin/python scripts/benchmark_rag_params.py \
+  --modes vector,hybrid,rerank \
+  --chunk-sizes 512 \
+  --top-k-values 4 \
+  --verbose
+```
+
+查看 `by_tag.confusion` 与全量 `mrr`；hard 子集上 hybrid/rerank 应不低于 vector。
+
+**实测（2026-09）**：vector hit@1=88% → hybrid/rerank hit@1=92%；MRR 0.92 → 0.96。
+
 ---
 
 ## 5. 基线门禁
@@ -172,7 +196,7 @@ pip install -r requirements-eval.txt
 ./.venv/bin/python scripts/eval_ragas.py --run --ragas  # 需 OPENAI_API_KEY
 ```
 
-用例需 `expected_answer`；当前 23 条用例中约 40% 已标注。
+用例需 `expected_answer`；当前 **40 条**用例中约 **70%** 已标注（含 hard 混淆集）。
 
 ---
 

@@ -15,7 +15,7 @@ RAG 质量不能只看最终答案。需要 **L1→L4 分层评测**，每层有
 
 - 作为调参者，我跑 `make analyze-chunks` 看空块率与边界质量，再跑 `make benchmark` 对比 chunk/top_k/检索模式。
 - 作为检索优化者，我用 `--modes vector,hybrid,rerank,hybrid_rerank,mmr` 证明 hybrid/rerank 对 keyword 类问题的收益。
-- 作为面试准备者，我结合四层金字塔与 `benchmark_cases.json`（≥20 条）说明分层评测与 MRR 含义。
+- 作为面试准备者，我结合四层金字塔与 `benchmark_cases.json`（**40 条**，含 hard 混淆集）说明分层评测与 MRR 含义。
 - 作为 CI 维护者，我跑 `make eval-smoke`，低于 `baseline.json` 则 PR 失败。
 - 作为线上运维，我通过 `/metrics` 看检索/生成延迟分位数与 Token 估算。
 - 作为产品迭代者，用户点踩后，我执行 `make export-bad-cases` 将差评回流为 benchmark 用例。
@@ -80,9 +80,35 @@ RAG 质量不能只看最终答案。需要 **L1→L4 分层评测**，每层有
 
 ### 4.2 规模要求
 
-- **面试级**：≥ **20 条**用例，覆盖 sample-docs 全部 3 篇文档
+- **面试级**：≥ **20 条**用例；当前 **40 条**（2026-09）
+- **文档覆盖**：`sample-docs/` 共 **6 篇**
+  - **基础集（3 篇）**：`refund-policy.md`、`remote-work-policy.md`、`it-faq.md`
+  - **Hard 混淆集（3 篇）**：`benefits-policy.md`、`security-policy.md`、`procurement-policy.md`
 - 每条含 `tags`；≥ 30% 含 `expected_answer`（供 L3）
-- `keyword` 类 ≥ 3 条（验证 hybrid 收益）
+- `keyword` 类 ≥ 3 条；`confusion` 类 ≥ 10 条（验证 vector vs hybrid/rerank 差异）
+
+### 4.2.1 Hard 混淆集设计原则
+
+多文档故意包含**相似表述、相同数字、不同语义**，用于拉开检索模式差距：
+
+| 混淆对 | 示例问题 | 期望文档 | vector 易错 |
+|--------|----------|----------|-------------|
+| 退款 vs 差旅报销 | 「到账需要几个工作日？」 | 需区分产品退款 / 差旅报销 | benefits vs refund |
+| IT P0 vs 安全 P0 | 「P0 响应时间？」 | 15 分钟 vs 30 分钟 | security vs it-faq |
+| 员工 VPN vs 外包 VPN | 「VPN 客户端？」 | AnyConnect vs OpenVPN | security vs it-faq |
+| 产品热线 vs 福利热线 | 「客服热线？」 | 400-888-0001 vs 0022 | benefits vs refund |
+
+**验收**：在 hard 子集上，`hybrid` 或 `rerank` 的 hit@1 / MRR **应 ≥ vector**（或相等）。
+
+**实测（chunk=512, top_k=4, 2026-09）**：
+
+| mode | hit@1 | hit@k | MRR | avg ret_ms |
+|------|-------|-------|-----|------------|
+| vector | 88% | 100% | 0.92 | 27 |
+| hybrid | **92%** | 100% | **0.96** | 62 |
+| rerank | **92%** | 98% | 0.95 | 2112 |
+
+vector 易错题：`Cisco AnyConnect 版本`、`P0 响应时间`、`付费产品退款到账`（与 benefits 混淆）等；hybrid 借助 BM25 关键词匹配可提升 Top1。
 
 ### 4.3 推荐 tags
 
@@ -95,6 +121,10 @@ RAG 质量不能只看最终答案。需要 **L1→L4 分层评测**，每层有
 | `it` | IT 服务台 | it-faq.md |
 | `refund` | 退款政策 | refund-policy.md |
 | `remote` | 远程办公 | remote-work-policy.md |
+| `benefits` | 福利差旅 | benefits-policy.md |
+| `security` | 信息安全 | security-policy.md |
+| `procurement` | 采购合同 | procurement-policy.md |
+| `confusion` | 多文档混淆 | hard 子集，对比 vector/hybrid |
 
 ### 4.4 示例
 
@@ -213,8 +243,8 @@ RAG 质量不能只看最终答案。需要 **L1→L4 分层评测**，每层有
 - [ ] `make benchmark` 无 LLM API Key 可完成
 - [ ] 输出含 `mrr`、`avg_retrieval_ms`、`by_tag`
 - [ ] `--modes vector,hybrid,rerank,mmr,hybrid_rerank` 均可运行（rerank 本地可下载模型）
-- [ ] `keyword` 标签：hybrid hit@1 ≥ vector hit@1（或相等）
-- [ ] 用例 ≥ 20 条，覆盖 3 篇 sample-docs
+- [ ] `keyword` / `confusion` 标签：hybrid hit@1 ≥ vector hit@1（hard 子集上应能体现差异）
+- [ ] 用例 ≥ 20 条，覆盖 **6 篇** sample-docs（含 hard 混淆集）
 
 ### 8.3 基线门禁（CI）
 

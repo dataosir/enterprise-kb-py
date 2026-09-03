@@ -58,7 +58,7 @@
 ## 7. 验收标准
 
 - [ ] 上传 `.md` 后 `GET /api/documents` 显示 `READY` 且 `chunkCount > 0`
-- [ ] 首次启动空库自动加载 3 篇 sample-docs，重启不重复
+- [ ] 首次启动空库自动加载 6 篇 sample-docs，重启不重复
 - [ ] 配置 Redis 后 ≥1MB 文件返回 `jobId`，Worker 完成后变 `READY`
 - [ ] ES 启用时入库后 `sync-es` 或自动双写可检索
 

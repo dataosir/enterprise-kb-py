@@ -114,7 +114,7 @@ RecursiveCharacterTextSplitter(
 | **avg_top_score** | Top-1 向量距离（L2，越小越相似） | ✅ 同上 |
 | **avg_context_chars** | Top-K 拼接后字符数 | ✅ 同上（与 `max_context_chars` 预算相关） |
 
-**解读示例**（sample-docs 5 条用例）：
+**解读示例**（sample-docs **40 条**用例，含 `confusion` hard 子集）：
 
 ```
 chunk=256  hit@1=60%  hit@k=80%  chunks=42   ← 块细，召回高但噪声多
@@ -150,7 +150,7 @@ make benchmark
 # → data/benchmark/benchmark_rag_params.csv
 ```
 
-评测用例：`scripts/benchmark_cases.json`（5 条，含 `question` + `expected_filename`）。
+评测用例：`scripts/benchmark_cases.json`（**40 条**，含 `question` + `expected_filename` + `tags` + `difficulty`）。
 
 ---
 

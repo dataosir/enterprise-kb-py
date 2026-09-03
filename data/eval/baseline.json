@@ -1,6 +1,8 @@
 {
   "updated_at": "2026-09-03",
-  "description": "L1/L2 评测基线；CI smoke 对比此文件。更新: check_eval_baseline.py --update-baseline",
+  "description": "L1/L2 评测基线（40 题 / 6 篇 sample-docs，含 hard 混淆集）；CI smoke 对比此文件。更新: check_eval_baseline.py --update-baseline",
+  "benchmark_case_count": 40,
+  "sample_doc_count": 6,
   "l1_chunk": {
     "chunk_size": 512,
     "chunk_overlap": 64,
